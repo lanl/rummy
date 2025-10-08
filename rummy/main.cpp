@@ -30,11 +30,6 @@ void Deal(Rummy::Deck *deck) {
 }
 
 std::string DefinePC() {
-  // std::string pc = R"(
-  //   <physical/constants>
-  //    c = 3e8
-  //    kb = 1.380649e-23
-  // )";
   std::string pc = "c = 3e8";
   return pc;
 }
@@ -47,21 +42,6 @@ int main(int argc, char *argv[]) {
     // deck->Build(argv[1]);
     deck.Build(argv[1], DefinePC());
 
-    // const auto &a = deck->GetVector<double>("/", "a");
-    // for (const auto &val : a) {
-    //   std::cout << val << std::endl;
-    // }
-    // deck->UpdateVector("/", "a", {0.1, 0.2, 0.3});
-    // const auto &a1 = deck->GetVector<double>("/", "a");
-    // for (const auto &val : a1) {
-    //   std::cout << val << std::endl;
-    // }
-
-    // deck->AddVector("<new>", "a", {10.0, 20.0, 30.0});
-    // const auto &a2 = deck->GetVector<double>("<new>", "a");
-    // for (const auto &val : a2) {
-    //   std::cout << val << std::endl;
-    // }
     Deal(&deck);
   }
   return 0;

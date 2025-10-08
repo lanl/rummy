@@ -32,8 +32,6 @@
 
 namespace Rummy {
 
-// TODO
-
 class Card {
  public:
   int loc;
