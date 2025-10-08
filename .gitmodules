@@ -1,0 +1,6 @@
+[submodule "external/Catch2"]
+	path = external/Catch2
+	url = https://github.com/catchorg/Catch2
+[submodule "external/pips"]
+	path = external/pips
+	url = https://github.com/adamdempsey90/pips
