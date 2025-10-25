@@ -41,20 +41,33 @@ TEST_CASE("Deck") {
     }
 
     WHEN("We add a new card") {
-      deck.AddCard("suit1", "card5", 7.77);
+      deck.AddCard("suit1", "card5", 7.77, "Test comment for card5");
       THEN("The new card should be added correctly") {
         auto card = deck.GetCard("suit1", "card5");
         REQUIRE(card.suit == "suit1");
         REQUIRE(card.name == "card5");
+        REQUIRE(card.comment == "Test comment for card5");
         FLOAT_REQUIRE(deck.GetCardValue<double>("suit1", "card5"), 7.77);
       }
     }
 
     WHEN("We update an existing card") {
+      auto original_comment = deck.GetCard("suit1", "card1").comment;
       deck.UpdateCard("suit1", "card1", 84);
       THEN("The card should be updated correctly") {
         auto card = deck.GetCard("suit1", "card1");
         FLOAT_REQUIRE(deck.GetCardValue<double>("suit1", "card1"), 84);
+        // Comment should be preserved when not explicitly provided
+        REQUIRE(card.comment == original_comment);
+      }
+    }
+
+    WHEN("We update a card with a new comment") {
+      deck.UpdateCard("suit1", "card1", 84, "Updated comment");
+      THEN("The card should be updated with the new comment") {
+        auto card = deck.GetCard("suit1", "card1");
+        FLOAT_REQUIRE(deck.GetCardValue<double>("suit1", "card1"), 84);
+        REQUIRE(card.comment == "Updated comment");
       }
     }
 
@@ -73,10 +86,12 @@ TEST_CASE("Deck") {
     }
 
     WHEN("We add a new suit") {
-      deck.AddCard("suit3", "newcard", 999.0);
+      deck.AddCard("suit3", "newcard", 999.0, "New suit comment");
       THEN("The new suit should be created") {
         REQUIRE(deck.GetSuit("suit3").size() == 1);
         FLOAT_REQUIRE(deck.GetCardValue<double>("suit3", "newcard"), 999.0);
+        auto card = deck.GetCard("suit3", "newcard");
+        REQUIRE(card.comment == "New suit comment");
       }
     }
   }
@@ -103,10 +118,12 @@ TEST_CASE("Deck - String Values") {
     }
 
     WHEN("We add a string card") {
-      deck.AddCard("suit1", "card3", std::string("test"));
+      deck.AddCard("suit1", "card3", std::string("test"), "String card comment");
       THEN("The string card should be added correctly") {
         auto value = deck.GetCardValue<std::string>("suit1", "card3");
         REQUIRE(value == "test");
+        auto card = deck.GetCard("suit1", "card3");
+        REQUIRE(card.comment == "String card comment");
       }
     }
   }
@@ -133,10 +150,12 @@ TEST_CASE("Deck - Boolean Values") {
     }
 
     WHEN("We add a boolean card") {
-      deck.AddCard("suit1", "card3", true);
+      deck.AddCard("suit1", "card3", true, "Boolean card comment");
       THEN("The boolean card should be added correctly") {
         auto value = deck.GetCardValue<bool>("suit1", "card3");
         REQUIRE(value == true);
+        auto card = deck.GetCard("suit1", "card3");
+        REQUIRE(card.comment == "Boolean card comment");
       }
     }
   }
@@ -192,7 +211,7 @@ TEST_CASE("Deck - Vector Operations") {
     }
 
     WHEN("We add a vector") {
-      deck.AddVector("suit1", "card2", std::vector<double>{4.0, 5.0, 6.0});
+      deck.AddVector("suit1", "card2", std::vector<double>{4.0, 5.0, 6.0}, "Vector comment");
 
       THEN("The vector should be added correctly") {
         auto vector_val = deck.GetVector<double>("suit1", "card2");
@@ -200,11 +219,14 @@ TEST_CASE("Deck - Vector Operations") {
         FLOAT_REQUIRE(vector_val[0], 4.0);
         FLOAT_REQUIRE(vector_val[1], 5.0);
         FLOAT_REQUIRE(vector_val[2], 6.0);
+        // Check comment on first element
+        auto card = deck.GetCard("suit1", "card2[0]");
+        REQUIRE(card.comment == "Vector comment");
       }
     }
 
     WHEN("We update a vector") {
-      deck.UpdateVector("suit1", "card1", std::vector<double>{7.0, 8.0});
+      deck.UpdateVector("suit1", "card1", std::vector<double>{7.0, 8.0}, "Updated vector comment");
 
       THEN("The vector should be updated correctly") {
         auto vector_val = deck.GetVector<double>("suit1", "card1");
@@ -212,6 +234,9 @@ TEST_CASE("Deck - Vector Operations") {
         FLOAT_REQUIRE(vector_val[0], 7.0);
         FLOAT_REQUIRE(vector_val[1], 8.0);
         FLOAT_REQUIRE(vector_val[2], 3.0);
+        // Check comment on updated element
+        auto card = deck.GetCard("suit1", "card1[0]");
+        REQUIRE(card.comment == "Updated vector comment");
       }
     }
   }
@@ -254,12 +279,13 @@ TEST_CASE("Deck - Build with Additional Configuration") {
 
 TEST_CASE("Card - Constructor and Methods") {
   GIVEN("A card object") {
-    Rummy::Card card("hearts", "ace", 1.0, 5);
+    Rummy::Card card("hearts", "ace", 1.0, "hearts ace", 5);
 
     WHEN("We access card properties") {
       THEN("The properties should be correct") {
         REQUIRE(card.suit == "hearts");
         REQUIRE(card.name == "ace");
+        REQUIRE(card.comment == "hearts ace");
         REQUIRE(card.loc == 5);
         FLOAT_REQUIRE(card.Get<int>(), 1);
         REQUIRE(card.GetString() == "1");
@@ -272,6 +298,7 @@ TEST_CASE("Card - Constructor and Methods") {
       THEN("The copy should be identical") {
         REQUIRE(card2.suit == "hearts");
         REQUIRE(card2.name == "ace");
+        REQUIRE(card2.comment == "hearts ace");
         REQUIRE(card2.loc == 5);
         FLOAT_REQUIRE(card2.Get<double>(), 1.0);
       }
@@ -293,9 +320,9 @@ TEST_CASE("Card - Constructor and Methods") {
 
 TEST_CASE("Card - Different Value Types") {
   GIVEN("Cards with different value types") {
-    Rummy::Card string_card("spades", "king", std::string("face"));
-    Rummy::Card bool_card("clubs", "joker", true);
-    Rummy::Card int_card("diamonds", "ten", 10);
+    Rummy::Card string_card("spades", "king", std::string("face"), "String card", -1);
+    Rummy::Card bool_card("clubs", "joker", true, "Boolean card", -1);
+    Rummy::Card int_card("diamonds", "ten", 10, "Integer card", -1);
 
     WHEN("We get string representations") {
       THEN("Each type should convert correctly") {
@@ -312,6 +339,14 @@ TEST_CASE("Card - Different Value Types") {
         REQUIRE(int_card.Get<int>() == 10);
       }
     }
+
+    WHEN("We check comments") {
+      THEN("Each card should have the correct comment") {
+        REQUIRE(string_card.comment == "String card");
+        REQUIRE(bool_card.comment == "Boolean card");
+        REQUIRE(int_card.comment == "Integer card");
+      }
+    }
   }
 }
 
@@ -324,11 +359,68 @@ TEST_CASE("Deck - Edge Cases") {
       deck.Build(empty_ss);
 
       THEN("We can add cards to it") {
-        deck.AddCard("empty_suit", "empty_card", 0);
+        deck.AddCard("empty_suit", "empty_card", 0, "Empty card comment");
         auto card = deck.GetCard("empty_suit", "empty_card");
         REQUIRE(card.suit == "empty_suit");
         REQUIRE(card.name == "empty_card");
+        REQUIRE(card.comment == "Empty card comment");
         FLOAT_REQUIRE(card.Get<int>(), 0);
+      }
+    }
+  }
+}
+
+TEST_CASE("Card - Comment Operations") {
+  GIVEN("A card with a comment") {
+    Rummy::Card card("hearts", "ace", 1, "Original comment", 5);
+
+    WHEN("We get the comment") {
+      auto comment = card.GetComment();
+      THEN("The comment should be correct") {
+        REQUIRE(comment == "Original comment");
+        REQUIRE(card.comment == "Original comment");
+      }
+    }
+
+    WHEN("We update the comment") {
+      card.UpdateComment("New comment");
+      THEN("The comment should be updated") {
+        REQUIRE(card.GetComment() == "New comment");
+        REQUIRE(card.comment == "New comment");
+      }
+    }
+
+    WHEN("We update the comment to an empty string") {
+      card.UpdateComment("");
+      THEN("The comment should be empty") {
+        REQUIRE(card.GetComment() == "");
+        REQUIRE(card.comment == "");
+      }
+    }
+  }
+
+  GIVEN("Multiple cards with different comments") {
+    Rummy::Deck deck;
+    deck.AddCard("test", "card1", 10, "Comment 1");
+    deck.AddCard("test", "card2", 20, "Comment 2");
+    deck.AddCard("test", "card3", 30, "Comment 3");
+
+    WHEN("We retrieve and verify each comment") {
+      THEN("Each card should have its own comment") {
+        REQUIRE(deck.GetCard("test", "card1").GetComment() == "Comment 1");
+        REQUIRE(deck.GetCard("test", "card2").GetComment() == "Comment 2");
+        REQUIRE(deck.GetCard("test", "card3").GetComment() == "Comment 3");
+      }
+    }
+
+    WHEN("We update one card's comment") {
+      auto &card = deck.GetCard("test", "card2");
+      card.UpdateComment("Modified comment");
+      
+      THEN("Only that card's comment should change") {
+        REQUIRE(deck.GetCard("test", "card1").GetComment() == "Comment 1");
+        REQUIRE(deck.GetCard("test", "card2").GetComment() == "Modified comment");
+        REQUIRE(deck.GetCard("test", "card3").GetComment() == "Comment 3");
       }
     }
   }
