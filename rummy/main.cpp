@@ -35,8 +35,11 @@ std::string DefinePC() {
 }
 
 int main(int argc, char *argv[]) {
-
-  if (argc == 2) {
+  if (argc == 1) {
+    pips::VM vm;
+    printf("Booting up REPL\n");
+    vm.repl('\n');
+  } else if (argc == 2) {
     // auto deck = std::make_unique<Rummy::Deck>();
     Rummy::Deck deck;
     // deck->Build(argv[1]);
