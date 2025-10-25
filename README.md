@@ -44,14 +44,14 @@ vars = "density", "velocity", "pressure"
  cv = 1.0/(gamma - 1.0)               # Reference local variables in your node
 
 <../conductivity>
- kappa = hcond/(rho * gas_eos.cv)     # reference other node variables 
+ kappa = hcond/(rho * gas.eos.cv)     # reference other node variables 
  
 <hydro>
  cfl = 0.8
 <../riemann>
  solver = "hllc"
 
-print(gas_conductivity.kappa)         # Print variables to stdout when the input deck is compiled
+print(gas.conductivity.kappa)         # Print variables to stdout when the input deck is compiled
 ```
 
 # Features

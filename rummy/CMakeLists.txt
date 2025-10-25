@@ -41,48 +41,51 @@ target_compile_definitions(rummylib PUBLIC STACK_MAX=${RUMMY_STACK_SIZE} STRING_
 target_link_libraries(rummylib PUBLIC pipslib)
 
 
-# Disable executable automatically for builds with downstream codes
 if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
-   message(STATUS "Standalone mode. Adding rummy executable")
+   message(STATUS "Standalone mode. Adding rummy executable and install targets")
    add_executable(rummy main.cpp)
    target_link_libraries(rummy PUBLIC Rummy::rummy)
+
+  # Installation
+  include(GNUInstallDirs)
+
+  install(TARGETS rummylib EXPORT RummyTargets
+      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+      ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  )
+
+  # Install headers
+  install(DIRECTORY . DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rummy
+      FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h"
+  )
+
+  # Export targets
+  install(EXPORT RummyTargets
+      FILE RummyTargets.cmake
+      NAMESPACE Rummy::
+      DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Rummy
+  )
+
+  # Create config file
+  include(CMakePackageConfigHelpers)
+  write_basic_package_version_file(
+      "${CMAKE_CURRENT_BINARY_DIR}/cmake/RummyConfigVersion.cmake"
+      VERSION "1.0" 
+      COMPATIBILITY AnyNewerVersion
+  )
+
+  configure_package_config_file(
+      "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/RummyConfig.cmake.in"
+      "${CMAKE_CURRENT_BINARY_DIR}/RummyConfig.cmake"
+      INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Rummy
+  )
+
+  install(FILES
+      "${CMAKE_CURRENT_BINARY_DIR}/RummyConfig.cmake"
+      "${CMAKE_CURRENT_BINARY_DIR}/RummyConfigVersion.cmake"
+      DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Rummy
+  )
 else()
-# Installation
-install(TARGETS rummylib EXPORT RummyTargets
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-)
-
-# Install headers
-install(DIRECTORY . DESTINATION include/rummy
-    FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h"
-)
-
-# Export targets
-install(EXPORT RummyTargets
-    FILE RummyTargets.cmake
-    NAMESPACE Rummy::
-    DESTINATION lib/cmake/Rummy
-)
-
-# Create config file
-include(CMakePackageConfigHelpers)
-write_basic_package_version_file(
-    "${CMAKE_CURRENT_BINARY_DIR}/RummyConfigVersion.cmake"
-    VERSION ${PROJECT_VERSION}
-    COMPATIBILITY AnyNewerVersion
-)
-
-configure_package_config_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/RummyConfig.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/RummyConfig.cmake"
-    INSTALL_DESTINATION lib/cmake/Rummy
-)
-
-install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/RummyConfig.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/RummyConfigVersion.cmake"
-    DESTINATION lib/cmake/Rummy
-)
+  message(STATUS "Rummy built as subproject - no install/export")
 endif()

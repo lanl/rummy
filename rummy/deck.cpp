@@ -43,45 +43,22 @@ void Deck::Build(std::string fname, std::string prepends) {
   }
 }
 
-void Deck::Build(std::stringstream &ss, std::string prepends) {
+void Deck::Build(std::istream &ss, std::string prepends) {
   std::stringstream pss;
   pss << prepends;
   Build(pss);
   Build(ss);
 }
 
-void Deck::Build(std::stringstream &ss, std::stringstream &prepends) {
+void Deck::Build(std::istream &ss, std::istream &prepends) {
   Build(prepends);
   Build(ss);
 }
 
-void Deck::Build(std::stringstream &ss) {
-
-  pips::VM vm;
+void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations, std::map<std::string, std::string> &comments) {
   pips::VTable locals;
-  std::map<std::string, int> locations;
-
-  if (!deck.empty()) {
-    for (const auto &suit : deck) {
-      for (const auto &card : suit.second) {
-        // replace suit name / with _
-        std::string suit_name = suit.first;
-        if (suit_name == "/") {
-          vm.globals[card.first] = card.second.GetValue();
-          locations[card.first] = card.second.loc;
-        } else {
-          std::replace(suit_name.begin(), suit_name.end(), '/', '_');
-          // use suit name as prefix
-          vm.globals[suit_name + "." + card.first] = card.second.GetValue();
-          locations[suit_name + "." + card.first] = card.second.loc;
-        }
-      }
-    }
-  }
-
-  // std::cout << ss.str() << std::endl;
-
   std::string line;
+  std::string comment;
   std::string multiline;
   bool line_continue = false;
 
@@ -101,8 +78,19 @@ void Deck::Build(std::stringstream &ss) {
     if (line.compare(first_char, 1, "#") == 0) continue; // skip comments
     // remove trailing comments
     auto last_comment = line.find_first_of("#");
+    std::string this_comment;
     if (last_comment != std::string::npos) {
+      // preserve the comment
+      this_comment = line.substr(last_comment + 1);
       line = line.substr(0, last_comment);
+      this_comment.erase(std::remove(this_comment.begin(), this_comment.end(), '&'), this_comment.end());
+      RemoveLeadingWhitespace(this_comment);
+      RemoveTrailingWhitespace(this_comment);
+      if (line_continue && !this_comment.empty()) {
+        comment += " " + this_comment;
+      } else if (!line_continue) {
+        comment = this_comment;
+      }
     }
     // the multiline character has to be the last character of the line
     // once comments and whitespace are removed
@@ -137,6 +125,7 @@ void Deck::Build(std::stringstream &ss) {
     }
 
     // start of a new suit
+    // TODO define the start and end characters in cmake
     if (line.compare(first_char, 1, "<") == 0) {
       auto last_char = line.find_first_of(">");
       if (last_char == std::string::npos) {
@@ -163,6 +152,10 @@ void Deck::Build(std::stringstream &ss) {
       } else {
         curr_suit = suit_name;
         prev_suit = curr_suit;
+      }
+      if (deck.find(curr_suit) == deck.end()) {
+       // deck[curr_suit] = std::map<std::string, Card>();
+        suits.push_back(curr_suit);
       }
       locals.clear();
       continue;
@@ -197,7 +190,7 @@ void Deck::Build(std::stringstream &ss) {
       global_name = local_name;
     } else {
       std::string suit_card_name = curr_suit;
-      std::replace(suit_card_name.begin(), suit_card_name.end(), '/', '_');
+      std::replace(suit_card_name.begin(), suit_card_name.end(), '/', '.');
       // use suit name as prefix
       name_prefix = suit_card_name + ".";
       global_name = name_prefix + local_name;
@@ -282,6 +275,8 @@ void Deck::Build(std::stringstream &ss) {
       }
       auto value = vm.globals[global_name.c_str()];
       locations[global_name.c_str()] = line_num;
+      comments[global_name.c_str()] = comment;
+      comment.clear();
       // Stash the local for this suit
       locals[local_name.c_str()] = value;
     } else if (!lhs_vec && rhs_vec) {
@@ -327,6 +322,8 @@ void Deck::Build(std::stringstream &ss) {
         }
         auto vec_value = vm.globals[vec_name.c_str()];
         locations[vec_name.c_str()] = line_num;
+        comments[vec_name.c_str()] = comment;
+        comment.clear();
         // Stash the local for this suit
         std::string local_vec_name = local_name + "[" + std::to_string(index) + "]";
         locals[local_vec_name.c_str()] = vec_value;
@@ -359,31 +356,104 @@ void Deck::Build(std::stringstream &ss) {
         }
         auto value = vm.globals[global_vec_name.c_str()];
         locations[global_vec_name.c_str()] = line_num;
+        comments[global_vec_name.c_str()] = comment;
+        comment.clear();
         // Stash the local for this suit
         locals[local_vec_name.c_str()] = value;
       }
     }
 
   } // end while
+}
+
+void Deck::Build(std::istream &ss) {
+
+  // TODO:
+  // Support include statements
+
+
+  // TODO:
+  //   combine comment and location into a metadata struct 
+  std::map<std::string, int> locations;
+  std::map<std::string, std::string> comments;
+
+  if (!deck.empty()) {
+    for (const auto &suit : deck) {
+      for (const auto &card : suit.second) {
+        // replace suit name / with _
+        std::string suit_name = suit.first;
+        if (suit_name == "/") {
+          vm.globals[card.first] = card.second.GetValue();
+          locations[card.first] = card.second.loc;
+          comments[card.first] = card.second.GetComment();
+        } else {
+          std::replace(suit_name.begin(), suit_name.end(), '/', '_');
+          // use suit name as prefix
+          vm.globals[suit_name + "." + card.first] = card.second.GetValue();
+          locations[suit_name + "." + card.first] = card.second.loc;
+          comments[suit_name + "." + card.first] = card.second.GetComment();
+        }
+      }
+    }
+  }
+  CompileInput(ss, locations, comments);
+
+  
 
   for (auto global : vm.globals) {
     const int loc = locations[global.first];
-    const auto first_dot = global.first.find('.');
+    const auto comment = comments[global.first];
+    // find position of the last dot
+    const auto last_dot = global.first.find_last_of('.');
     std::string suit, card_name;
-    if (first_dot == std::string::npos) {
+    if (last_dot == std::string::npos) {
       suit = "/";
       card_name = global.first;
     } else {
-      suit = global.first.substr(0, first_dot);
-      card_name = global.first.substr(first_dot + 1);
-      std::replace(suit.begin(), suit.end(), '_', '/');
+      suit = global.first.substr(0, last_dot);
+      card_name = global.first.substr(last_dot + 1);
+      std::replace(suit.begin(), suit.end(), '.', '/');
     }
-    CopyCard(Card(suit, card_name, global.second, loc));
+    CopyCard(Card(suit, card_name, global.second, comment, loc));
   }
+}
+
+void Deck::RecompileCard(const std::string &line) {
+  // The line should already be in the correct format
+  // so we can pass it directly to compiler
+
+if (vm.interpret(line.c_str(), '\n') != pips::InterpretResult::OK) {
+    std::stringstream msg;
+    msg << "Failed to compile expression '" << line << "'";
+    fatal(msg);
+  }
+  return;
+}
+void Deck::UpdateDeck(void) {
+  // Update the table
+  for (auto global : vm.globals) {
+    const auto last_dot = global.first.find_last_of('.');
+    std::string suit, card_name;
+    if (last_dot == std::string::npos) {
+      suit = "/";
+      card_name = global.first;
+    } else {
+      suit = global.first.substr(0, last_dot);
+      card_name = global.first.substr(last_dot + 1);
+      std::replace(suit.begin(), suit.end(), '.', '/');
+    }
+    UpdateCard(suit, card_name, global.second);
+  }
+  return;
 }
 
 Card &Deck::GetCard(const std::string &suit, const std::string &name) {
   auto suit_it = deck.find(suit);
+  if (suit_it == deck.end()) {
+    std::stringstream msg;
+    msg << "Suit '" << suit << "' not found in the deck.";
+    fatal(msg);
+  }
   auto &card = deck[suit][name];
   if (card.empty()) {
     std::stringstream msg;
@@ -392,11 +462,29 @@ Card &Deck::GetCard(const std::string &suit, const std::string &name) {
   }
   return card;
 }
+void Deck::RemoveCard(const std::string &suit, const std::string &name) {
+  auto suit_it = deck.find(suit);
+  if (suit_it == deck.end()) {
+    std::stringstream msg;
+    msg << "Suit '" << suit << "' not found in the deck.";
+    fatal(msg);
+  }
+  auto card_it = suit_it->second.find(name);
+  if (card_it == suit_it->second.end()) {
+    std::stringstream msg;
+    msg << "Card '" << name << "' not found in suit '" << suit << "'.";
+    fatal(msg);
+  }
+  suit_it->second.erase(card_it);
+}
 
 void Deck::UpdateCard(const std::string &suit, const std::string &name,
-                      const Card &card) {
+                      const Card &card, std::string comment) {
   auto &mycard = GetCard(suit, name);
-  mycard = card; // use the assignment operator
+  mycard = card;
+  if (!comment.empty() && (comment != "")) {
+    mycard.UpdateComment(comment);
+  } 
 }
 // functions to iterate over the deck
 // FindSuit returns a map of cards that match the suit
@@ -441,6 +529,38 @@ std::vector<Card> Deck::FindCardFuzzy(std::string suit, std::string name) const 
     }
   }
   return result;
+}
+bool Deck::DoesSuitExist(const std::string &suit) const {
+  return deck.find(suit) != deck.end();
+}
+bool Deck::DoesCardExist(const std::string &suit, const std::string &name) const {
+  auto suit_it = deck.find(suit);
+  if (suit_it == deck.end()) return false;
+  return suit_it->second.find(name) != suit_it->second.end();
+}
+void Deck::WriteDeck(std::ostream &os) const {
+  for (const auto &suit_name : suits) {
+    if (deck.find(suit_name) == deck.end()) continue;
+    if (!( suit_name.empty() || (suit_name == "/"))) {
+      os << "<" << suit_name << ">\n";
+    }
+    const auto &suit = deck.at(suit_name);
+    for (const auto &card_pair : suit) {
+      const auto &card = card_pair.second;
+      const std::string name = card_pair.first;
+      os << name << " = ";
+      if (card.isString()) {
+        os << "\"" << card.GetString() << "\"";
+      } else {
+        os << card.GetString();
+      }
+      if (!card.GetComment().empty()) {
+        os << "  # " << card.GetComment();
+      }
+      os << "\n";
+    }
+    os << "\n";
+  }
 }
 
 } // namespace Rummy
