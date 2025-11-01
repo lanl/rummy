@@ -556,7 +556,9 @@ bool Deck::DoesSuitExist(const std::string &suit) const {
 bool Deck::DoesCardExist(const std::string &suit, const std::string &name) const {
   auto suit_it = deck.find(suit);
   if (suit_it == deck.end()) return false;
-  return suit_it->second.find(name) != suit_it->second.end();
+  // Be careful of vectors
+  return (suit_it->second.find(name) != suit_it->second.end()) || 
+         (suit_it->second.find(name + "[0]") != suit_it->second.end());
 }
 void Deck::WriteDeck(std::ostream &os) const {
   for (const auto &suit_name : suits) {
