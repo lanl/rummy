@@ -203,7 +203,7 @@ class Deck {
   std::map<std::string, Card> FindSuit(const std::string &suit) const;
   // fuzzy match version of FindSuit
   std::vector<Card> FindSuitFuzzy(std::string suit_) const;
-  std::vector<Card> FindSuitInOrder(const std::string &suit) const;
+  std::vector<Card> FindSuitInOrder(const std::string &suit, const bool fuzzy=false) const;
   std::vector<Card> FindCardFuzzy(std::string suit, std::string name) const;
   bool DoesSuitExist(const std::string &suit) const;
   bool DoesCardExist(const std::string &suit, const std::string &name) const;
@@ -255,7 +255,7 @@ class Deck {
 
  private:
   pips::VM vm;
-  std::map<std::string, std::map<std::string, Card>> deck;
+  std::map<std::string, std::map<std::string, Card>> deck = {{"/", {}}};
   std::vector<std::string> suits = {"/"}; // suits in order
 };
 

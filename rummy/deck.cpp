@@ -499,7 +499,10 @@ std::map<std::string, Card> Deck::FindSuit(const std::string &suit) const {
 }
 // fuzzy match version of FindSuit
 std::vector<Card> Deck::FindSuitFuzzy(std::string suit_) const {
-  suit_.replace(suit_.find('*'), 1, ""); // replace * with .*
+  if (suit_ != "/") {
+    // replace * with .*
+    suit_.replace(suit_.find('*'), 1, ""); 
+  }
   std::vector<Card> result;
   for (const auto &suit : deck) {
     if (suit.first.find(suit_) != std::string::npos) {
@@ -508,14 +511,31 @@ std::vector<Card> Deck::FindSuitFuzzy(std::string suit_) const {
         result.push_back(card.second);
       }
     }
-  }
+  } 
   if (result.empty()) {
     std::cerr << "No suits matching '" << suit_ << "' found in the deck." << std::endl;
   }
   return result;
 }
-std::vector<Card> Deck::FindSuitInOrder(const std::string &suit) const {
-  auto subdeck = FindSuitFuzzy(suit);
+std::vector<Card> Deck::FindSuitInOrder(const std::string &suit, const bool fuzzy) const {
+  std::vector<Card> subdeck;
+  if (fuzzy) {
+    subdeck = FindSuitFuzzy(suit);
+  } else {
+    const auto &block = deck.find(suit);
+    if (block == deck.end()) {
+      if (suit != "/") {
+        std::stringstream msg;
+        msg << "Suit '" << suit << "' not found in the deck.";
+        fatal(msg);
+      }
+    } else {
+      for (const auto &card : block->second) {
+        subdeck.push_back(card.second);
+      }
+    }
+    
+  }
   std::sort(subdeck.begin(), subdeck.end(),
             [](const Card &a, const Card &b) { return a.loc < b.loc; });
   return subdeck;
