@@ -64,7 +64,7 @@ function(rummy_configure_coverage)
                 --object-directory "${CMAKE_BINARY_DIR}"
                 --filter "${CMAKE_SOURCE_DIR}/rummy/"
                 --filter "${CMAKE_SOURCE_DIR}/external/pips/"
-                --exclude ".*/Catch2/.*"
+                --exclude-directories ".*/Catch2/.*"
                 --html-details "${RUMMY_COVERAGE_DETAILS_HTML}"
                 --no-html-details-syntax-highlighting
                 --html-self-contained
