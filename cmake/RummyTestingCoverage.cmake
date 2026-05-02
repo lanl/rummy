@@ -11,6 +11,8 @@
 #  the public, perform publicly and display publicly, and to permit others to do so.
 # ========================================================================================
 
+# This file was created in part with generative AI
+
 include_guard(GLOBAL)
 
 include(CTest)

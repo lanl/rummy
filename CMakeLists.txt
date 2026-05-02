@@ -11,6 +11,8 @@
 #  the public, perform publicly and display publicly, and to permit others to do so.
 # ========================================================================================
 
+# This file was created in part with generative AI
+
 cmake_minimum_required (VERSION 3.15)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS On)
