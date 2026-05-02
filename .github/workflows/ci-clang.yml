@@ -1,0 +1,49 @@
+name: CI Clang
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-test-coverage-clang:
+    runs-on: ubuntu-latest
+    env:
+      GCOV: llvm-cov gcov
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build clang llvm gcovr
+
+      - name: Configure (Clang)
+        run: |
+          cmake -S . -B build-clang -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DRUMMY_ENABLE_UNIT_TESTS=ON \
+            -DRUMMY_ENABLE_COVERAGE=ON
+
+      - name: Build
+        run: cmake --build build-clang
+
+      - name: Run unit tests
+        run: ctest --test-dir build-clang --output-on-failure
+
+      - name: Generate coverage report
+        run: cmake --build build-clang --target coverage_html
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-clang-html
+          path: build-clang/coverage/

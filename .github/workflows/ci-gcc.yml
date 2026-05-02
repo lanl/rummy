@@ -1,0 +1,47 @@
+name: CI GCC
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-test-coverage-gcc:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build g++ gcovr
+
+      - name: Configure (GCC)
+        run: |
+          cmake -S . -B build-gcc -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_COMPILER=g++ \
+            -DRUMMY_ENABLE_UNIT_TESTS=ON \
+            -DRUMMY_ENABLE_COVERAGE=ON
+
+      - name: Build
+        run: cmake --build build-gcc
+
+      - name: Run unit tests
+        run: ctest --test-dir build-gcc --output-on-failure
+
+      - name: Generate coverage report
+        run: cmake --build build-gcc --target coverage_html
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-gcc-html
+          path: build-gcc/coverage/
