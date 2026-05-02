@@ -195,7 +195,13 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
     EmptyCheck(local_name, line_num);
     std::string card_value = line.substr(eq_char + 1);
     EmptyCheck(card_value, line_num);
-    RemoveWhitespacePreserveQuotes(card_value, line_num);
+    // Trim leading/trailing whitespace only — preserve internal spacing
+    card_value.erase(0, card_value.find_first_not_of(" \t\r\n"));
+    card_value.erase(card_value.find_last_not_of(" \t\r\n") + 1);
+    // Strip whitespace only from the parts outside quoted strings for the
+    // string-value case; the raw card_value is kept for expressions.
+    std::string card_value_stripped = card_value;
+    RemoveWhitespacePreserveQuotes(card_value_stripped, line_num);
     EmptyCheck(card_value, line_num);
     std::string global_name;
     std::string name_prefix;
@@ -231,10 +237,10 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
       }
       lhs_vec = true;
     }
-    open_bracket = card_value.find_first_of('[');
+    open_bracket = card_value_stripped.find_first_of('[');
     if (open_bracket != std::string::npos) {
       // we have a vector case
-      auto close_bracket = card_value.find_first_of(']', open_bracket);
+      auto close_bracket = card_value_stripped.find_first_of(']', open_bracket);
       if (close_bracket == std::string::npos) {
         std::stringstream msg;
         msg << "Missing closing ']' in vector declaration at line " << line_num;
@@ -244,42 +250,45 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
     } else {
       // allow vector without []. Look for comma separated values
       // a = 1,2,3
-      // but ignore commas in strings
-      if (card_value.find_first_of(',') != std::string::npos) {
-        // a = "strings, with", "commas, in", "them"
-        // loop through string, keeping track of being inside quotes, if a comma happens
-        // outside, done
-        auto comma_pos = card_value.find_first_of(',');
+      // but ignore commas inside parentheses (e.g. atan2(a,b)) or quotes
+      if (card_value_stripped.find_first_of(',') != std::string::npos) {
+        auto comma_pos = card_value_stripped.find_first_of(',');
         while (comma_pos != std::string::npos) {
           bool in_quotes = false;
+          int paren_depth = 0;
           for (size_t i = 0; i < comma_pos; i++) {
-            if (card_value[i] == '"') {
-              in_quotes = !in_quotes;
-            }
+            char c = card_value_stripped[i];
+            if (c == '"') in_quotes = !in_quotes;
+            else if (!in_quotes && c == '(') paren_depth++;
+            else if (!in_quotes && c == ')') paren_depth--;
           }
-          if (!in_quotes) {
+          if (!in_quotes && paren_depth == 0) {
             rhs_vec = true;
             break;
           }
-          comma_pos = card_value.find_first_of(',', comma_pos + 1);
+          comma_pos = card_value_stripped.find_first_of(',', comma_pos + 1);
         }
       }
     }
-    const bool has_comma = card_value.find_first_of(',') != std::string::npos;
+    const bool has_comma = card_value_stripped.find_first_of(',') != std::string::npos;
     if (local_name.find_first_of(',') != std::string::npos) {
       std::stringstream msg;
       msg << "Cannot have comma in card name at line " << line_num;
       fatal(msg);
     }
 
-    // Check for colon outside of quoted strings in card_value
+    // A colon is a slice separator only when it appears inside [...] on the
+    // LHS or RHS. A bare colon (e.g. from a ternary a ? b : c) is not a slice.
     bool has_colon = (local_name.find_first_of(':') != std::string::npos);
-    if (!has_colon) {
+    if (!has_colon && rhs_vec) {
+      // Only look for a colon if we already know we're in a vector context
       bool in_quotes = false;
-      for (char c : card_value) {
-        if (c == '"') {
-          in_quotes = !in_quotes;
-        } else if (c == ':' && !in_quotes) {
+      bool in_brackets = false;
+      for (char c : card_value_stripped) {
+        if (c == '"') in_quotes = !in_quotes;
+        else if (!in_quotes && c == '[') in_brackets = true;
+        else if (!in_quotes && c == ']') in_brackets = false;
+        else if (!in_quotes && in_brackets && c == ':') {
           has_colon = true;
           break;
         }
@@ -306,19 +315,19 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
     } else if (!lhs_vec && rhs_vec) {
       // a = [1,2,3]
       // loop through comma separated values
-      auto open_bracket = card_value.find_first_of('[');
+      auto open_bracket = card_value_stripped.find_first_of('[');
       if (open_bracket != std::string::npos) {
-        auto close_bracket = card_value.find_first_of(']', open_bracket);
-        card_value =
-            card_value.substr(open_bracket + 1, close_bracket - open_bracket - 1);
+        auto close_bracket = card_value_stripped.find_first_of(']', open_bracket);
+        card_value_stripped =
+            card_value_stripped.substr(open_bracket + 1, close_bracket - open_bracket - 1);
       }
 
-      // Split card_value by commas, but ignore commas inside quotes
+      // Split card_value_stripped by commas, but ignore commas inside quotes
       std::vector<std::string> values;
       std::string current;
       bool in_quotes = false;
-      for (size_t i = 0; i < card_value.size(); ++i) {
-        char c = card_value[i];
+      for (size_t i = 0; i < card_value_stripped.size(); ++i) {
+        char c = card_value_stripped[i];
         if (c == '"') {
           in_quotes = !in_quotes;
           current += c;
@@ -357,7 +366,7 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
       // a[1:2] = [1,2]
       // a[:2] = b[:2]
       // These are handled by replicating the line and substituting the indices
-      auto card_values = SplitString(card_value, line_num);
+      auto card_values = SplitString(card_value_stripped, line_num);
       auto card_names = SplitString(local_name, line_num, card_values.size());
 
       // the RHS is split up

@@ -658,3 +658,210 @@ TEST_CASE("Deck - Relative suit name (..)") {
     }
   }
 }
+
+TEST_CASE("pips - Arithmetic operators") {
+  GIVEN("A deck with arithmetic expressions") {
+    Rummy::Deck deck;
+    std::stringstream ss;
+    ss << "<math>\n"
+       << "add      = 3 + 4\n"
+       << "sub      = 10 - 3\n"
+       << "mul      = 6 * 7\n"
+       << "div      = 1.0 / 4.0\n"
+       << "intdiv   = 7 // 2\n"
+       << "mod      = 10 % 3\n"
+       << "pow_op   = 2 ** 10\n"
+       << "neg      = -5\n"
+       << "uplus    = +3\n";
+    deck.Build(ss);
+
+    THEN("Results are correct") {
+      FLOAT_REQUIRE(deck.GetCardValue<double>("math", "add"),    7.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("math", "sub"),    7.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("math", "mul"),   42.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("math", "div"),    0.25);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("math", "intdiv"), 3.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("math", "mod"),    1.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("math", "pow_op"), 1024.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("math", "neg"),   -5.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("math", "uplus"),  3.0);
+    }
+  }
+}
+
+TEST_CASE("pips - Comparison and logical operators") {
+  GIVEN("A deck with comparison and logical expressions") {
+    Rummy::Deck deck;
+    std::stringstream ss;
+    ss << "<logic>\n"
+       << "eq_true  = 1 == 1\n"
+       << "eq_false = 1 == 2\n"
+       << "ne_true  = 1 != 2\n"
+       << "ne_false = 1 != 1\n"
+       << "gt       = 5 > 3\n"
+       << "ge       = 3 >= 3\n"
+       << "lt       = 2 < 4\n"
+       << "le       = 4 <= 4\n"
+       << "and_tt   = true and true\n"
+       << "and_tf   = true and false\n"
+       << "or_ff    = false or false\n"
+       << "or_tf    = true or false\n"
+       << "not_t    = !true\n"
+       << "not_f    = !false\n"
+       << "ternary  = 1 == 1 ? 42 : 0\n";
+    deck.Build(ss);
+
+    THEN("Comparison results are correct") {
+      REQUIRE(deck.GetCardValue<bool>("logic", "eq_true")  == true);
+      REQUIRE(deck.GetCardValue<bool>("logic", "eq_false") == false);
+      REQUIRE(deck.GetCardValue<bool>("logic", "ne_true")  == true);
+      REQUIRE(deck.GetCardValue<bool>("logic", "ne_false") == false);
+      REQUIRE(deck.GetCardValue<bool>("logic", "gt")       == true);
+      REQUIRE(deck.GetCardValue<bool>("logic", "ge")       == true);
+      REQUIRE(deck.GetCardValue<bool>("logic", "lt")       == true);
+      REQUIRE(deck.GetCardValue<bool>("logic", "le")       == true);
+    }
+    THEN("Logical operators are correct") {
+      REQUIRE(deck.GetCardValue<bool>("logic", "and_tt") == true);
+      REQUIRE(deck.GetCardValue<bool>("logic", "and_tf") == false);
+      REQUIRE(deck.GetCardValue<bool>("logic", "or_ff")  == false);
+      REQUIRE(deck.GetCardValue<bool>("logic", "or_tf")  == true);
+      REQUIRE(deck.GetCardValue<bool>("logic", "not_t")  == false);
+      REQUIRE(deck.GetCardValue<bool>("logic", "not_f")  == true);
+    }
+    THEN("Ternary operator is correct") {
+      FLOAT_REQUIRE(deck.GetCardValue<double>("logic", "ternary"), 42.0);
+    }
+  }
+}
+
+TEST_CASE("pips - Bitwise operators") {
+  GIVEN("A deck with bitwise expressions") {
+    Rummy::Deck deck;
+    std::stringstream ss;
+    ss << "<bits>\n"
+       << "band   = 12 & 10\n"    // 0b1100 & 0b1010 = 0b1000 = 8
+       << "bor    = 12 | 10\n"    // 0b1100 | 0b1010 = 0b1110 = 14
+       << "xor    = 12 xor 10\n"  // 0b1100 ^ 0b1010 = 0b0110 = 6 (keyword)
+       << "xor_c  = 12 ^ 10\n"    // 0b1100 ^ 0b1010 = 0b0110 = 6 (keyword)
+       << "bnot   = ~0\n"         // ~0 = -1 (all bits set)
+       << "lshift = 1 << 4\n"     // 1 << 4 = 16
+       << "rshift = 32 >> 2\n";   // 32 >> 2 = 8
+    deck.Build(ss);
+
+    THEN("Bitwise results are correct") {
+      FLOAT_REQUIRE(deck.GetCardValue<double>("bits", "band"),    8.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("bits", "bor"),    14.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("bits", "xor"),     6.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("bits", "xor_c"),     6.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("bits", "bnot"),   -1.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("bits", "lshift"), 16.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("bits", "rshift"),  8.0);
+    }
+  }
+}
+
+TEST_CASE("pips - Math functions") {
+  GIVEN("A deck with all math function calls") {
+    const double pi = std::acos(-1.0);
+    Rummy::Deck deck;
+    std::stringstream ss;
+    ss << "<fn>\n"
+       << "pi_val  = pi\n"
+       << "exp_e   = exp(1)\n"
+       << "ln_e    = log(exp(1))\n"
+       << "lg10    = log10(100)\n"
+       << "sq      = sqrt(9)\n"
+       << "ab_neg  = abs(-7)\n"
+       << "ab_pos  = abs(3)\n"
+       << "sg_pos  = sign(5)\n"
+       << "sg_neg  = sign(-3)\n"
+       << "sg_zero = sign(0)\n"
+       << "cl      = ceil(1.2)\n"
+       << "fl      = floor(1.9)\n"
+       << "sn      = sin(pi / 6)\n"
+       << "sn_pi   = sin(pi)\n"
+       << "sn_pi2  = sin(pi / 2)\n"
+       << "sn_2pi  = sin(2 * pi)\n"
+       << "sn_-pi = sin(-pi)\n"
+       << "sn_-pi2 = sin(-pi / 2)\n"
+       << "sn_-2pi = sin(-2 * pi)\n"
+       << "cs      = cos(pi / 3)\n"
+       << "cs_pi   = cos(pi)\n"
+       << "cs_pi2  = cos(pi / 2)\n"
+       << "cs_2pi  = cos(2 * pi)\n"
+       << "cs_-pi = cos(-pi)\n"
+       << "cs_-pi2 = cos(-pi / 2)\n"
+       << "cs_-2pi = cos(-2 * pi)\n"
+       << "tn      = tan(pi / 4)\n"
+       << "tn_pi   = tan(pi)\n"
+       << "tn_pi2  = tan(pi / 2)\n"
+       << "tn_2pi  = tan(2 * pi)\n"
+       << "tn_-pi = tan(-pi)\n"
+       << "tn_-pi2 = tan(-pi / 2)\n"
+       << "tn_-2pi = tan(-2 * pi)\n"
+       << "ac      = acos(1)\n"
+       << "as      = asin(1)\n"
+       << "at      = atan(1)\n"
+       << "at2     = atan2(1, 1)\n"
+       << "mn      = min(3, 7)\n"
+       << "mx      = max(3, 7)\n";
+    deck.Build(ss);
+
+    THEN("Constants are correct") {
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "pi_val"), pi, 1e-12);
+    }
+    THEN("Exponential and logarithm functions are correct") {
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "exp_e"), std::exp(1.0),   1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "ln_e"),  1.0,              1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "lg10"),  2.0,              1e-12);
+    }
+    THEN("sqrt is correct") {
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sq"), 3.0, 1e-12);
+    }
+    THEN("abs is correct") {
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "ab_neg"), 7.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "ab_pos"), 3.0, 1e-12);
+    }
+    THEN("sign is correct") {
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sg_pos"),  1.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sg_neg"), -1.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sg_zero"), 0.0, 1e-12);
+    }
+    THEN("ceil and floor are correct") {
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cl"), 2.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "fl"), 1.0, 1e-12);
+    }
+    THEN("Trig functions are correct") {
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn"),  0.5,    1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_pi"), 0.0,    1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_pi2"), 1.0,    1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_2pi"), 0.0,    1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_-pi"), 0.0,    1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_-pi2"), -1.0,   1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_-2pi"), 0.0,    1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs"),  0.5,    1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_pi"), -1.0,   1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_pi2"), 0.0,    1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_2pi"), 1.0,    1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_-pi"), -1.0,   1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_-pi2"), 0.0,    1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_-2pi"), 1.0,    1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn"),  1.0,    1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn_pi"), 0.0,    1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn_pi2"), std::tan(pi/2.0), 1e-12); // should be very large
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn_2pi"), 0.0,    1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn_-pi"), 0.0,    1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn_-pi2"), std::tan(-pi/2.0), 1e-12); // should be very large negative
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn_-2pi"), 0.0,    1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "ac"),  0.0,    1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "as"),  pi/2.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "at"),  pi/4.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "at2"), pi/4.0, 1e-12);
+    }
+    THEN("min and max are correct") {
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "mn"), 3.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "mx"), 7.0, 1e-12);
+    }
+  }
+}
