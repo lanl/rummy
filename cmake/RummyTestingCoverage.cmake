@@ -41,8 +41,7 @@ function(rummy_configure_coverage)
     file(WRITE "${CMAKE_BINARY_DIR}/CTestCustom.cmake"
       "set(CTEST_CUSTOM_COVERAGE_EXCLUDE\n"
       "  \"/usr/.*\"\n"
-      "  \".*/external/Catch2/.*\"\n"
-      "  \".*/out/build/.*/Catch2/.*\"\n"
+      "  \".*/Catch2/.*\"\n"
       ")\n"
     )
 
@@ -62,17 +61,15 @@ function(rummy_configure_coverage)
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
         COMMAND ${RUMMY_GCOVR_EXECUTABLE}
                 --root "${CMAKE_SOURCE_DIR}"
-                --object-directory "${CMAKE_BINARY_DIR}"
-                --filter "${CMAKE_SOURCE_DIR}/rummy"
-                --filter "${CMAKE_SOURCE_DIR}/tst"
-                --filter "${CMAKE_BINARY_DIR}/external/pips"
-                --exclude ".*/external/Catch2/.*"
-                --exclude ".*/out/build/.*/Catch2/.*"
-                --html-details
+                --filter "${CMAKE_SOURCE_DIR}/rummy/"
+                --filter "${CMAKE_SOURCE_DIR}/external/pips/"
+                --html-details "${RUMMY_COVERAGE_DETAILS_HTML}"
                 --no-html-details-syntax-highlighting
                 --html-self-contained
-                --output "${RUMMY_COVERAGE_DETAILS_HTML}"
                 --print-summary
+                "${CMAKE_BINARY_DIR}/rummy"
+                "${CMAKE_BINARY_DIR}/tst"
+        VERBATIM
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
         COMMENT "Run tests and generate gcovr detailed HTML coverage report"
       )

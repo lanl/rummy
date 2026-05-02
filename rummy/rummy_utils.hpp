@@ -62,23 +62,33 @@ inline void RemoveWhitespace(std::string &str) {
 
 inline void RemoveWhitespacePreserveQuotes(std::string &str, const int line_num,
                                            char quote_char = '"') {
-  auto quote_pos = str.find_first_of(quote_char);
-  if (quote_pos == std::string::npos) {
+  if (str.find_first_of(quote_char) == std::string::npos) {
     RemoveWhitespace(str);
     return;
   }
-  auto end_quote_pos = str.find_first_of(quote_char, quote_pos + 1);
-  if (end_quote_pos == std::string::npos) {
-    std::stringstream msg;
-    msg << "Missing closing quote in card value at line " << line_num;
-    fatal(msg);
+  std::string result;
+  size_t pos = 0;
+  while (pos <= str.size()) {
+    auto quote_start = str.find(quote_char, pos);
+    // Strip whitespace from the unquoted segment before the next quote (or end)
+    std::string unquoted = str.substr(pos, quote_start == std::string::npos
+                                              ? std::string::npos
+                                              : quote_start - pos);
+    RemoveWhitespace(unquoted);
+    result += unquoted;
+    if (quote_start == std::string::npos) break;
+    // Find matching closing quote
+    auto quote_end = str.find(quote_char, quote_start + 1);
+    if (quote_end == std::string::npos) {
+      std::stringstream msg;
+      msg << "Missing closing quote in card value at line " << line_num;
+      fatal(msg);
+    }
+    // Preserve the quoted segment verbatim
+    result += str.substr(quote_start, quote_end - quote_start + 1);
+    pos = quote_end + 1;
   }
-  std::string before_quote = str.substr(0, quote_pos);
-  RemoveWhitespace(before_quote);
-  std::string quoted_value = str.substr(quote_pos, end_quote_pos - quote_pos + 1);
-  std::string after_quote = str.substr(end_quote_pos + 1);
-  RemoveWhitespace(after_quote);
-  str = before_quote + quoted_value + after_quote;
+  str = result;
 }
 
 inline std::vector<std::string> SplitString(const std::string &str, const int line_num,
@@ -153,14 +163,23 @@ inline std::vector<std::string> SplitString(const std::string &str, const int li
     }
 
     // combine parts with slices
+    if (lowers.empty()) {
+      std::stringstream msg;
+      msg << "Vector slice syntax requires '[start:end]' brackets at line " << line_num;
+      fatal(msg);
+    }
     int count = 99999;
-    for (int i = 0; i < lowers.size(); i++) {
+    for (size_t i = 0; i < lowers.size(); i++) {
       count = std::min(count, uppers[i] - lowers[i]);
     }
     for (int i = 0; i < count; i++) {
       std::string contents;
-      for (int j = 0; j < parts.size(); j++) {
-        contents += parts[j] + "[" + std::to_string(lowers[j] + i) + "]";
+      for (size_t j = 0; j < parts.size(); j++) {
+        if (j < lowers.size()) {
+          contents += parts[j] + "[" + std::to_string(lowers[j] + i) + "]";
+        } else {
+          contents += parts[j];
+        }
       }
       RemoveWhitespacePreserveQuotes(contents, line_num);
       vec.push_back(contents);
