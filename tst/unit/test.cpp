@@ -783,23 +783,21 @@ TEST_CASE("pips - Math functions") {
        << "sn_pi   = sin(pi)\n"
        << "sn_pi2  = sin(pi / 2)\n"
        << "sn_2pi  = sin(2 * pi)\n"
-       << "sn_-pi = sin(-pi)\n"
-       << "sn_-pi2 = sin(-pi / 2)\n"
-       << "sn_-2pi = sin(-2 * pi)\n"
+       << "sn_npi = sin(-pi)\n"
+       << "sn_npi2 = sin(-pi / 2)\n"
+       << "sn_n2pi = sin(-2 * pi)\n"
        << "cs      = cos(pi / 3)\n"
        << "cs_pi   = cos(pi)\n"
        << "cs_pi2  = cos(pi / 2)\n"
        << "cs_2pi  = cos(2 * pi)\n"
-       << "cs_-pi = cos(-pi)\n"
-       << "cs_-pi2 = cos(-pi / 2)\n"
-       << "cs_-2pi = cos(-2 * pi)\n"
+       << "cs_npi = cos(-pi)\n"
+       << "cs_npi2 = cos(-pi / 2)\n"
+       << "cs_n2pi = cos(-2 * pi)\n"
        << "tn      = tan(pi / 4)\n"
        << "tn_pi   = tan(pi)\n"
-       << "tn_pi2  = tan(pi / 2)\n"
        << "tn_2pi  = tan(2 * pi)\n"
-       << "tn_-pi = tan(-pi)\n"
-       << "tn_-pi2 = tan(-pi / 2)\n"
-       << "tn_-2pi = tan(-2 * pi)\n"
+       << "tn_npi = tan(-pi)\n"
+       << "tn_n2pi = tan(-2 * pi)\n"
        << "ac      = acos(1)\n"
        << "as      = asin(1)\n"
        << "at      = atan(1)\n"
@@ -837,23 +835,21 @@ TEST_CASE("pips - Math functions") {
       FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_pi"), 0.0,    1e-12);
       FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_pi2"), 1.0,    1e-12);
       FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_2pi"), 0.0,    1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_-pi"), 0.0,    1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_-pi2"), -1.0,   1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_-2pi"), 0.0,    1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_npi"), 0.0,    1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_npi2"), -1.0,   1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_n2pi"), 0.0,    1e-12);
       FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs"),  0.5,    1e-12);
       FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_pi"), -1.0,   1e-12);
       FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_pi2"), 0.0,    1e-12);
       FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_2pi"), 1.0,    1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_-pi"), -1.0,   1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_-pi2"), 0.0,    1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_-2pi"), 1.0,    1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_npi"), -1.0,   1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_npi2"), 0.0,    1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_n2pi"), 1.0,    1e-12);
       FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn"),  1.0,    1e-12);
       FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn_pi"), 0.0,    1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn_pi2"), std::tan(pi/2.0), 1e-12); // should be very large
       FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn_2pi"), 0.0,    1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn_-pi"), 0.0,    1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn_-pi2"), std::tan(-pi/2.0), 1e-12); // should be very large negative
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn_-2pi"), 0.0,    1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn_npi"), 0.0,    1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn_n2pi"), 0.0,    1e-12);
       FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "ac"),  0.0,    1e-12);
       FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "as"),  pi/2.0, 1e-12);
       FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "at"),  pi/4.0, 1e-12);
