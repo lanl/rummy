@@ -157,7 +157,7 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
         prev_suit = curr_suit;
       }
       if (deck.find(curr_suit) == deck.end()) {
-       // deck[curr_suit] = std::map<std::string, Card>();
+        deck[curr_suit] = std::map<std::string, Card>();
         suits.push_back(curr_suit);
       }
       locals.clear();
@@ -261,9 +261,19 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
       fatal(msg);
     }
 
-    // TODO exclude : in strings
-    const bool has_colon = (card_value.find_first_of(':') != std::string::npos) ||
-                           (local_name.find_first_of(':') != std::string::npos);
+    // Check for colon outside of quoted strings in card_value
+    bool has_colon = (local_name.find_first_of(':') != std::string::npos);
+    if (!has_colon) {
+      bool in_quotes = false;
+      for (char c : card_value) {
+        if (c == '"') {
+          in_quotes = !in_quotes;
+        } else if (c == ':' && !in_quotes) {
+          has_colon = true;
+          break;
+        }
+      }
+    }
     if (!has_colon && ((!lhs_vec && !rhs_vec) || (lhs_vec && !rhs_vec) ||
                        ((lhs_vec || rhs_vec) && !has_comma))) {
       // a = 2
@@ -503,8 +513,11 @@ std::map<std::string, Card> Deck::FindSuit(const std::string &suit) const {
 // fuzzy match version of FindSuit
 std::vector<Card> Deck::FindSuitFuzzy(std::string suit_) const {
   if (suit_ != "/") {
-    // replace * with .*
-    suit_.replace(suit_.find('*'), 1, ""); 
+    // remove wildcard character '*' if present
+    auto star_pos = suit_.find('*');
+    if (star_pos != std::string::npos) {
+      suit_.erase(star_pos, 1);
+    }
   }
   std::vector<Card> result;
   for (const auto &suit : deck) {

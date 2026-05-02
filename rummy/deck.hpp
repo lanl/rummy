@@ -42,7 +42,7 @@ class Card {
   std::string suit;
   std::string name;
   std::string comment;
-  Card() = default;
+  Card() : initialized(false) {}
 
   Card(const Card &other)
       : loc(other.loc), name(other.name), suit(other.suit), value(other.value), comment(other.comment),
@@ -157,6 +157,7 @@ class Deck {
   void AddCard(const std::string &suit, const std::string &name, const T &val, std::string comment = "") {
     if (deck.find(suit) == deck.end()) {
       deck[suit] = std::map<std::string, Card>();
+      suits.push_back(suit);
     }
     if constexpr (std::is_same_v<T, Card>) {
       deck[suit][name] = val;
