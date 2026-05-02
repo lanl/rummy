@@ -41,9 +41,7 @@ function(rummy_configure_coverage)
     file(WRITE "${CMAKE_BINARY_DIR}/CTestCustom.cmake"
       "set(CTEST_CUSTOM_COVERAGE_EXCLUDE\n"
       "  \"/usr/.*\"\n"
-      "  \".*/external/Catch2/.*\"\n"
-      "  \".*/out/build/.*/Catch2/.*\"\n"
-      "  \".*/build/.*/Catch2/.*\"\n"
+      "  \".*/Catch2/.*\"\n"
       ")\n"
     )
 
