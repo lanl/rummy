@@ -1,5 +1,5 @@
 ﻿# ========================================================================================
-#  (C) (or copyright) 2025. Triad National Security, LLC. All rights reserved.
+#  (C) (or copyright) 2025-2026. Triad National Security, LLC. All rights reserved.
 #
 #  This program was produced under U.S. Government contract 89233218CNA000001 for Los
 #  Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -17,14 +17,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS On)
 
 project ("rummy" LANGUAGES CXX)
 
-include(CTest)
-
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
 option(RUMMY_ENABLE_ASAN "Enable AddressSanitizer to detect memory errors" OFF)
-option(RUMMY_ENABLE_UNIT_TESTS "Enable unit tests" ON)
 
 if (POLICY CMP0141)
   cmake_policy(SET CMP0141 NEW)
@@ -40,11 +37,14 @@ if(EXISTS "${LOC_PATH}")
 endif()
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
+include(RummyTestingCoverage)
 
 if(RUMMY_ENABLE_ASAN)
   add_compile_options(-fsanitize=address -fsanitize=undefined)
   add_link_options(-fsanitize=address -fsanitize=undefined)
 endif()
+
+rummy_configure_coverage()
 
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
   # silence sprintf warnings on mac
@@ -98,20 +98,4 @@ endif()
 add_subdirectory(${PIPS_BUILD_DIR} ${CMAKE_CURRENT_BINARY_DIR}/pips-build)
 add_subdirectory ("rummy")
 
-if (RUMMY_ENABLE_UNIT_TESTS)
-  # Only configure and add unit-test support when rummy is the top-level project.
-  if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
-    message("\nConfiguring unit tests...\n")
-    find_package(Catch2 QUIET)
-    if (NOT Catch2_FOUND)
-      # Disable Catch2 installation and docs when building as subproject
-      set(CATCH_INSTALL_DOCS OFF CACHE BOOL "" FORCE)
-      set(CATCH_INSTALL_EXTRAS OFF CACHE BOOL "" FORCE)
-      add_subdirectory(external/Catch2 Catch2)
-      list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/external/Catch2/extras)
-    endif()
-    add_subdirectory(tst)
-  else()
-    message(STATUS "Rummy unit tests skipped when building as subproject")
-  endif()
-endif()
+rummy_add_unit_tests()
