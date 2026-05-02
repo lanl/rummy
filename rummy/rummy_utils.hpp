@@ -163,8 +163,13 @@ inline std::vector<std::string> SplitString(const std::string &str, const int li
     }
 
     // combine parts with slices
+    if (lowers.empty()) {
+      std::stringstream msg;
+      msg << "Vector slice syntax requires '[start:end]' brackets at line " << line_num;
+      fatal(msg);
+    }
     int count = 99999;
-    for (int i = 0; i < lowers.size(); i++) {
+    for (size_t i = 0; i < lowers.size(); i++) {
       count = std::min(count, uppers[i] - lowers[i]);
     }
     for (int i = 0; i < count; i++) {

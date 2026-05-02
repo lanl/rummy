@@ -79,22 +79,33 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
     auto first_char = line.find_first_not_of(" ");       // skip white space
     if (first_char == std::string::npos) continue;       // line is all white space
     if (line.compare(first_char, 1, "#") == 0) continue; // skip comments
-    // remove trailing comments
-    auto last_comment = line.find_first_of("#");
+    // remove trailing comments — skip '#' that appears inside a quoted string
     std::string this_comment;
-    if (last_comment != std::string::npos) {
-      // preserve the comment
-      this_comment = line.substr(last_comment + 1);
-      line = line.substr(0, last_comment);
-      this_comment.erase(std::remove(this_comment.begin(), this_comment.end(), '&'), this_comment.end());
-      RemoveLeadingWhitespace(this_comment);
-      RemoveTrailingWhitespace(this_comment);
-      if (line_continue && !this_comment.empty()) {
-        comment += " " + this_comment;
-      } else if (!line_continue) {
-        comment = this_comment;
+    {
+      bool in_quotes = false;
+      size_t last_comment = std::string::npos;
+      for (size_t ci = 0; ci < line.size(); ++ci) {
+        if (line[ci] == '"') {
+          in_quotes = !in_quotes;
+        } else if (line[ci] == '#' && !in_quotes) {
+          last_comment = ci;
+          break;
+        }
       }
-    }
+      if (last_comment != std::string::npos) {
+        // preserve the comment
+        this_comment = line.substr(last_comment + 1);
+        line = line.substr(0, last_comment);
+        this_comment.erase(std::remove(this_comment.begin(), this_comment.end(), '&'), this_comment.end());
+        RemoveLeadingWhitespace(this_comment);
+        RemoveTrailingWhitespace(this_comment);
+        if (line_continue && !this_comment.empty()) {
+          comment += " " + this_comment;
+        } else if (!line_continue) {
+          comment = this_comment;
+        }
+      }
+    } // end quote-aware comment search
     // the multiline character has to be the last character of the line
     // once comments and whitespace are removed
     auto last_char = line.find_last_not_of(" ");
@@ -357,7 +368,7 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
         msg << "More card names than values at line " << line_num;
         fatal(msg);
       }
-      for (int idx = 0; idx < card_names.size(); idx++) {
+      for (size_t idx = 0; idx < card_names.size(); idx++) {
         std::string local_vec_name = card_names[idx];
         std::string global_vec_name = name_prefix + local_vec_name;
 
@@ -400,7 +411,7 @@ void Deck::Build(std::istream &ss) {
           locations[card.first] = card.second.loc;
           comments[card.first] = card.second.GetComment();
         } else {
-          std::replace(suit_name.begin(), suit_name.end(), '/', '_');
+          std::replace(suit_name.begin(), suit_name.end(), '/', '.');
           // use suit name as prefix
           vm.globals[suit_name + "." + card.first] = card.second.GetValue();
           locations[suit_name + "." + card.first] = card.second.loc;
@@ -455,7 +466,9 @@ void Deck::UpdateDeck(void) {
       card_name = global.first.substr(last_dot + 1);
       std::replace(suit.begin(), suit.end(), '.', '/');
     }
-    UpdateCard(suit, card_name, global.second);
+    if (DoesSuitExist(suit) && DoesCardExist(suit, card_name)) {
+      UpdateCard(suit, card_name, global.second);
+    }
   }
   return;
 }
@@ -467,13 +480,13 @@ Card &Deck::GetCard(const std::string &suit, const std::string &name) {
     msg << "Suit '" << suit << "' not found in the deck.";
     fatal(msg);
   }
-  auto &card = deck[suit][name];
-  if (card.empty()) {
+  auto card_it = suit_it->second.find(name);
+  if (card_it == suit_it->second.end()) {
     std::stringstream msg;
     msg << "Card '" << name << "' not found in suit '" << suit << "'.";
     fatal(msg);
   }
-  return card;
+  return card_it->second;
 }
 void Deck::RemoveCard(const std::string &suit, const std::string &name) {
   auto suit_it = deck.find(suit);
@@ -583,9 +596,23 @@ void Deck::WriteDeck(std::ostream &os) const {
       os << "<" << suit_name << ">\n";
     }
     const auto &suit = deck.at(suit_name);
+    // Collect cards and sort by insertion order (loc), falling back to name for
+    // cards added programmatically (loc == -1). This preserves forward-reference
+    // correctness when the output is re-read.
+    std::vector<std::pair<std::string, const Card *>> ordered;
+    ordered.reserve(suit.size());
     for (const auto &card_pair : suit) {
-      const auto &card = card_pair.second;
-      const std::string name = card_pair.first;
+      ordered.push_back({card_pair.first, &card_pair.second});
+    }
+    std::sort(ordered.begin(), ordered.end(),
+              [](const auto &a, const auto &b) {
+                if (a.second->loc != b.second->loc)
+                  return a.second->loc < b.second->loc;
+                return a.first < b.first;
+              });
+    for (const auto &entry : ordered) {
+      const auto &card = *entry.second;
+      const std::string &name = entry.first;
       os << name << " = ";
       if (card.isString()) {
         os << "\"" << card.GetString() << "\"";

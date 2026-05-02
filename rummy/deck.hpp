@@ -132,10 +132,12 @@ class Card {
 class Deck {
  public:
   Deck() = default;
-  Deck(const Deck &other) : deck(other.deck) {}
+  Deck(const Deck &other) : deck(other.deck), suits(other.suits), vm(other.vm) {}
   Deck &operator=(const Deck &other) {
     if (this != &other) {
       deck = other.deck;
+      suits = other.suits;
+      vm = other.vm;
     }
     return *this;
   }
@@ -186,8 +188,7 @@ class Deck {
   T GetOrAddCardValue(const std::string &suit, const std::string &name, const T &val, std::string comment="Default value added at run time") {
     // Like AddCard, but don't error
     if (deck.find(suit) == deck.end()) {
-      deck[suit] = std::map<std::string, Card>();
-      AddCard<T>(suit,name,val, comment);
+      AddCard<T>(suit, name, val, comment);
       return val;
     }
     const auto it = deck[suit].find(name);
@@ -218,6 +219,13 @@ class Deck {
     // Deck stores vectors as separate cards with names of suit.name[index]
     std::string vname = name + "[";
     auto cards = FindCardFuzzy(suit, vname);
+    // Sort by numeric index so foo[10] comes after foo[9], not after foo[1]
+    std::sort(cards.begin(), cards.end(), [](const Card &a, const Card &b) {
+      auto ai = a.name.find_last_of('[');
+      auto bi = b.name.find_last_of('[');
+      if (ai == std::string::npos || bi == std::string::npos) return a.name < b.name;
+      return std::stoi(a.name.substr(ai + 1)) < std::stoi(b.name.substr(bi + 1));
+    });
     std::vector<T> vec;
     vec.reserve(cards.size());
     for (size_t i = 0; i < cards.size(); i++) {
