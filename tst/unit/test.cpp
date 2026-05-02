@@ -427,3 +427,234 @@ TEST_CASE("Card - Comment Operations") {
     }
   }
 }
+TEST_CASE("Deck - Hash inside quoted string value") {
+  GIVEN("A deck where a string value contains '#'") {
+    Rummy::Deck deck;
+    std::stringstream ss;
+    ss << "<suit1>\n"
+       << "url = \"http://example.com\"  # real comment\n"
+       << "tag = \"hello#world\"\n";
+    deck.Build(ss);
+
+    THEN("The string values should be preserved verbatim") {
+      REQUIRE(deck.GetCardValue<std::string>("suit1", "url") == "http://example.com");
+      REQUIRE(deck.GetCardValue<std::string>("suit1", "tag") == "hello#world");
+    }
+    THEN("The trailing comment on 'url' should be captured") {
+      REQUIRE(deck.GetCard("suit1", "url").GetComment() == "real comment");
+    }
+  }
+}
+
+TEST_CASE("Deck - Deck copy constructor and assignment") {
+  GIVEN("A built deck") {
+    Rummy::Deck original;
+    std::stringstream ss;
+    ss << "g = 9\n"
+       << "<physics>\n"
+       << "energy = 42\n"
+       << "<hydro>\n"
+       << "cfl = 0.3\n";
+    original.Build(ss);
+
+    WHEN("We copy-construct a new deck") {
+      Rummy::Deck copy(original);
+
+      THEN("All suits are present in the copy") {
+        REQUIRE(copy.DoesSuitExist("/"));
+        REQUIRE(copy.DoesSuitExist("physics"));
+        REQUIRE(copy.DoesSuitExist("hydro"));
+      }
+      THEN("Card values are correct in the copy") {
+        FLOAT_REQUIRE(copy.GetCardValue<double>("/", "g"), 9.0);
+        FLOAT_REQUIRE(copy.GetCardValue<double>("physics", "energy"), 42.0);
+        FLOAT_REQUIRE(copy.GetCardValue<double>("hydro", "cfl"), 0.3);
+      }
+      THEN("Suit order is preserved in the copy") {
+        auto suits = copy.GetSuitsInOrder();
+        REQUIRE(suits.size() == 3);
+        REQUIRE(suits[0] == "/");
+        REQUIRE(suits[1] == "physics");
+        REQUIRE(suits[2] == "hydro");
+      }
+    }
+
+    WHEN("We copy-assign a new deck") {
+      Rummy::Deck assigned;
+      assigned = original;
+
+      THEN("All suits are present in the assigned deck") {
+        REQUIRE(assigned.DoesSuitExist("physics"));
+        REQUIRE(assigned.DoesSuitExist("hydro"));
+      }
+      THEN("Suit order is preserved in the assigned deck") {
+        auto suits = assigned.GetSuitsInOrder();
+        REQUIRE(suits.size() == 3);
+        REQUIRE(suits[1] == "physics");
+        REQUIRE(suits[2] == "hydro");
+      }
+    }
+  }
+}
+
+TEST_CASE("Deck - AddCard adds new suit to ordering") {
+    GIVEN("An empty deck") {
+    Rummy::Deck deck;
+
+    WHEN("We add cards to a new suit programmatically") {
+      deck.AddCard("alpha", "x", 1.0);
+      deck.AddCard("beta",  "y", 2.0);
+
+      THEN("Both suits appear in order") {
+        auto suits = deck.GetSuitsInOrder();
+        REQUIRE(deck.DoesSuitExist("alpha"));
+        REQUIRE(deck.DoesSuitExist("beta"));
+        // '/' is always first; alpha and beta should follow
+        REQUIRE(std::find(suits.begin(), suits.end(), "alpha") != suits.end());
+        REQUIRE(std::find(suits.begin(), suits.end(), "beta")  != suits.end());
+      }
+
+      THEN("WriteDeck includes both suits") {
+        std::ostringstream out;
+        deck.WriteDeck(out);
+        REQUIRE_THAT(out.str(), Catch::Matchers::ContainsSubstring("alpha"));
+        REQUIRE_THAT(out.str(), Catch::Matchers::ContainsSubstring("beta"));
+      }
+    }
+
+    WHEN("We use GetOrAddCardValue to create a new suit") {
+      deck.GetOrAddCardValue<double>("newsuit", "card1", 7.0);
+
+      THEN("The new suit appears in ordering") {
+        auto suits = deck.GetSuitsInOrder();
+        REQUIRE(std::find(suits.begin(), suits.end(), "newsuit") != suits.end());
+      }
+      THEN("WriteDeck includes the new suit") {
+        std::ostringstream out;
+        deck.WriteDeck(out);
+        REQUIRE_THAT(out.str(), Catch::Matchers::ContainsSubstring("newsuit"));
+      }
+    }
+  }
+}
+
+TEST_CASE("Deck - GetVector correct order for large vectors") {
+  GIVEN("A deck with a vector of more than 9 elements") {
+    Rummy::Deck deck;
+    std::stringstream ss;
+    ss << "<suit1>\n";
+    // Build a 12-element vector inline
+    ss << "vec = 0,1,2,3,4,5,6,7,8,9,10,11\n";
+    deck.Build(ss);
+
+    WHEN("We retrieve the vector") {
+      auto vec = deck.GetVector<double>("suit1", "vec");
+
+      THEN("All 12 elements are present in numeric order") {
+        REQUIRE(vec.size() == 12);
+        for (int i = 0; i < 12; i++) {
+          FLOAT_REQUIRE(vec[i], static_cast<double>(i));
+        }
+      }
+    }
+  }
+}
+
+TEST_CASE("Deck - Second Build call preserves nested suit references") {
+  GIVEN("A deck with a nested suit (gas/eos)") {
+    Rummy::Deck deck;
+    std::stringstream ss1;
+    ss1 << "<gas>\n"
+        << "gamma = 1.4\n"
+        << "<../eos>\n"       
+        << "cv = 1.0\n";
+    deck.Build(ss1);
+
+    WHEN("We build again with an expression referencing gas/eos.cv") {
+      std::stringstream ss2;
+      ss2 << "<result>\n"
+          << "val = gas.eos.cv * 2\n";
+      deck.Build(ss2);
+
+      THEN("No phantom suit is created") {
+        // Should have: '/', 'gas', 'gas/eos', 'result' — not a spurious 'gas_eos'
+        REQUIRE_FALSE(deck.DoesSuitExist("gas_eos"));
+        REQUIRE(deck.DoesSuitExist("gas/eos"));
+      }
+      THEN("The computed value is correct") {
+        FLOAT_REQUIRE(deck.GetCardValue<double>("result", "val"), 2.0);
+      }
+    }
+  }
+}
+
+TEST_CASE("Deck - WriteDeck preserves declaration order") {
+  GIVEN("A deck where 'b' is declared before 'a' but 'a' references 'b'") {
+    Rummy::Deck deck;
+    std::stringstream ss;
+    ss << "<suit1>\n"
+       << "z_base = 10\n"        // alphabetically last, declared first
+       << "a_derived = z_base * 2\n"; // alphabetically first, declared second
+    deck.Build(ss);
+
+    WHEN("We write and re-read the deck") {
+      std::ostringstream out;
+      deck.WriteDeck(out);
+
+      Rummy::Deck deck2;
+      std::istringstream in(out.str());
+      deck2.Build(in);
+
+      THEN("The re-read deck has the correct value") {
+        FLOAT_REQUIRE(deck2.GetCardValue<double>("suit1", "a_derived"), 20.0);
+      }
+    }
+  }
+}
+
+TEST_CASE("Deck - Multiline continuation preserves comment") {
+  GIVEN("A deck with a multiline value") {
+    Rummy::Deck deck;
+    std::stringstream ss;
+    ss << "<suit1>\n"
+       << "x = 1 +  &  # part one\n"
+       << "    2        # part two\n";
+    deck.Build(ss);
+
+    THEN("The value is the sum of both lines") {
+      FLOAT_REQUIRE(deck.GetCardValue<double>("suit1", "x"), 3.0);
+    }
+    THEN("Comments from continuation lines are joined") {
+      REQUIRE_THAT(deck.GetCard("suit1", "x").GetComment(),
+                   Catch::Matchers::ContainsSubstring("part one"));
+      REQUIRE_THAT(deck.GetCard("suit1", "x").GetComment(),
+                   Catch::Matchers::ContainsSubstring("part two"));
+    }
+  }
+}
+
+TEST_CASE("Deck - Relative suit name (..)") {
+  GIVEN("A deck using relative suit syntax") {
+    Rummy::Deck deck;
+    std::stringstream ss;
+    ss << "<gas>\n"
+       << "name = \"hydrogen\"\n"
+       << "<../eos>\n"
+       << "gamma = 1.67\n"
+       << "type = \"ideal\"\n"
+       << "cv = 1.0 / (gamma - 1.0)\n";
+    deck.Build(ss);
+
+    THEN("Suits are correctly named") {
+      REQUIRE(deck.DoesSuitExist("gas"));
+      REQUIRE(deck.DoesSuitExist("gas/eos"));
+    }
+    THEN("Card values are correct") {
+      REQUIRE(deck.GetCardValue<std::string>("gas", "name") == "hydrogen");
+      REQUIRE(deck.GetCardValue<std::string>("gas/eos", "type") == "ideal");
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("gas/eos", "gamma"), 1.67, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("gas/eos", "cv"),
+                        1.0 / (1.67 - 1.0), 1e-12);
+    }
+  }
+}
