@@ -1,5 +1,8 @@
 # Rummy
 
+[![CI GCC](https://github.com/lanl/rummy/actions/workflows/ci-gcc.yml/badge.svg)](https://github.com/lanl/rummy/actions/workflows/ci-gcc.yml)
+[![CI Clang](https://github.com/lanl/rummy/actions/workflows/ci-clang.yml/badge.svg)](https://github.com/lanl/rummy/actions/workflows/ci-clang.yml)
+
 A flexible input deck parser and compiler. Rummy reads and compiles input decks in the Parthenon/Athena++ style:
 ```
 <suit1>
