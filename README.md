@@ -92,6 +92,28 @@ void ReadInputDeck(std::string fname) {
 The standard `GetCard`, `UpdateCard`, `AddCard` functions are available for retrieving and setting cards.
 Cards are stored in a two-layer map, `deck[suit][card]`, for simple traversal. 
 
+
+# Building and Running Tests
+
+Rummy uses CMake  and [Catch2](https://github.com/catchorg/Catch2).
+
+**Configure** (only needed once):
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Debug
+```
+
+**Build and run the unit tests:**
+```bash
+cmake --build build --target unit_tests -j$(nproc)
+cd build && ctest --test-dir tst/unit -V
+```
+
+**Build, run tests, and generate an HTML coverage report** (requires `gcovr`):
+```bash
+cmake --build build --target coverage_html -j$(nproc)
+```
+The report is written to `build/coverage_details.html`.
+
 # The Compiler
 
 The compiler was written while following the "Crafting Interpreters" book by Robert Nystrom. The compiler in that book is written in C and is meant to be a complete programming language with branch statements, loop statements, functions, and classes. 
