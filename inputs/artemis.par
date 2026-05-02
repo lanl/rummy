@@ -15,7 +15,7 @@ n = 512, 1, 1
 nb[:] = n[:3]
 dtmin = 1e-10
 
-gas_base = "gas.prim"
+gas_base = "gas.prim."
 
 out_vars = "density", "velocity", "sie"
 
@@ -49,27 +49,27 @@ nx1    = n[0]       # Number of zones in X1-direction
 x1min  = 0.0       # minimum value of X1
 x1max  = 0.01575       # maximum value of X1
 ix1_bc = "ic"        # inner-X1 boundary flag
-ox1_bc = "ic"        # outer-X1 boundary flag
+ox1_bc = ix1_bc       # outer-X1 boundary flag
 
 nx2    = n[1]        # Number of zones in X2-direction
 x2min  = 0.0       # minimum value of X2
 x2max  = 1.0       # maximum value of X2
 ix2_bc = "periodic"  # inner-X2 boundary flag
-ox2_bc = "periodic"  # outer-X2 boundary flag
+ox2_bc = ix2_bc       # outer-X2 boundary flag
 
 nx3    = n[2]         # Number of zones in X3-direction
 x3min  = 0.0       # minimum value of X3
 x3max  = 1.0       # maximum value of X3
-ix3_bc = "periodic"  # i9nner-X3 boundary flag
-ox3_bc = "periodic"  # outer-X3 boundary flag
+ix3_bc = "periodic"  # inner-X3 boundary flag
+ox3_bc = ix3_bc       # outer-X3 boundary flag
 
 <parthenon/swarm>
 ix1_bc = "jaybenne_reflecting"  # inner-X1 boundary flag for swarms
-ox1_bc = "jaybenne_reflecting"  # outer-X1 boundary flag for swarms
+ox1_bc = ix1_bc  # outer-X1 boundary flag for swarms
 ix2_bc = "periodic"  # inner-X2 boundary flag for swarms
-ox2_bc = "periodic"  # outer-X2 boundary flag for swarms
+ox2_bc = ix2_bc  # outer-X2 boundary flag for swarms
 ix3_bc = "periodic"  # inner-X3 boundary flag for swarms
-ox3_bc = "periodic"  # outer-X3 boundary flag for swarms
+ox3_bc = ix3_bc  # outer-X3 boundary flag for swarms
 
 <parthenon/meshblock>
 nx1 = nb[0]  # Number of cells in each MeshBlock, X1-dir

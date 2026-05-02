@@ -266,7 +266,7 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
       // a = 2
       // a[0] = 2
       // a = b[0]
-      std::string expr = global_name + " = " + card_value;
+      std::string expr = "var " + global_name + " = " + card_value;
       // add the local card to the locals table
       if (vm.interpret(expr.c_str(), '\n', locals) != pips::InterpretResult::OK) {
         std::stringstream msg;
@@ -314,7 +314,7 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
         EmptyCheck(value, line_num);
         // add the local card to the locals table
         std::string vec_name = global_name + "[" + std::to_string(index) + "]";
-        std::string expr = vec_name + " = " + value;
+        std::string expr = "var " + vec_name + " = " + value;
         if (vm.interpret(expr.c_str(), '\n', locals) != pips::InterpretResult::OK) {
           std::stringstream msg;
           msg << "Failed to compile expression '" << expr << "' at line " << line_num;
@@ -348,7 +348,7 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
         std::string local_vec_name = card_names[idx];
         std::string global_vec_name = name_prefix + local_vec_name;
 
-        std::string expr = global_vec_name + " = " + card_values[idx];
+        std::string expr = "var " + global_vec_name + " = " + card_values[idx];
         if (vm.interpret(expr.c_str(), '\n', locals) != pips::InterpretResult::OK) {
           std::stringstream msg;
           msg << "Failed to compile expression '" << expr << "' at line " << line_num;
