@@ -952,3 +952,131 @@ TEST_CASE("pips - __globals__ command") {
     }
   }
 }
+
+TEST_CASE("Deck - Reopen suit and redefine card") {
+  GIVEN("A deck where a suit is opened a second time to redefine a card") {
+    Rummy::Deck deck_out;
+    std::string output = captureStdout([&deck_out] {
+      std::stringstream ss;
+      ss << "<mesh>\n"
+         << "nx1 = 2\n"
+         << "<mesh>\n"
+         << "nx1 = 4\n"
+         << "print(mesh.nx1)\n";
+      deck_out.Build(ss);
+    });
+
+    THEN("The card holds the last assigned value") {
+      FLOAT_REQUIRE(deck_out.GetCardValue<double>("mesh", "nx1"), 4.0);
+    }
+    THEN("print outputs 4") {
+      REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("4"));
+    }
+  }
+}
+
+TEST_CASE("Deck - Dotted name redefinition") {
+  GIVEN("A deck where a previously declared card is redefined using dotted syntax") {
+    Rummy::Deck deck_out;
+    std::string output = captureStdout([&deck_out] {
+      std::stringstream ss;
+      ss << "<mesh>\n"
+         << "nx1 = 2\n"
+         << "<hydro>\n"
+         << "mesh.nx1 = 4\n"  // dotted absolute redefinition from a different suit
+         << "print(mesh.nx1)\n";
+      deck_out.Build(ss);
+    });
+
+    THEN("mesh.nx1 holds the redefined value") {
+      FLOAT_REQUIRE(deck_out.GetCardValue<double>("mesh", "nx1"), 4.0);
+    }
+    THEN("print outputs 4") {
+      REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("4"));
+    }
+  }
+}
+
+TEST_CASE("Deck - Dotted name redefinition of a vector element") {
+  GIVEN("A deck where one element of a previously declared vector is redefined using dotted syntax") {
+    Rummy::Deck deck_out;
+    std::string output = captureStdout([&deck_out] {
+      std::stringstream ss;
+      ss << "<mesh>\n"
+         << "coords = 1, 2, 3\n"
+         << "<hydro>\n"
+         << "mesh.coords[1] = 99\n"  // dotted absolute redefinition of a vector element
+         << "print(mesh.coords[1])\n";
+      deck_out.Build(ss);
+    });
+
+    THEN("mesh.coords vector has the updated element") {
+      auto coords = deck_out.GetVector<double>("mesh", "coords");
+      REQUIRE(coords.size() == 3);
+      FLOAT_REQUIRE(coords[0], 1.0);
+      FLOAT_REQUIRE(coords[1], 99.0);
+      FLOAT_REQUIRE(coords[2], 3.0);
+    }
+    THEN("print outputs 99") {
+      REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("99"));
+    }
+  }
+}
+
+TEST_CASE("Deck - Dotted name redefinition of a vector slice") {
+  GIVEN("A deck where a slice of a previously declared vector is redefined using dotted syntax") {
+    Rummy::Deck deck_out;
+    std::string output = captureStdout([&deck_out] {
+      std::stringstream ss;
+      ss << "<mesh>\n"
+         << "coords = 1, 2, 3\n"
+         << "<hydro>\n"
+         << "mesh.coords[:2] = [10, 20]\n"  // dotted slice redefinition of first two elements
+         << "print(mesh.coords[0])\n"
+         << "print(mesh.coords[1])\n";
+      deck_out.Build(ss);
+    });
+
+    THEN("mesh.coords has the updated slice with third element unchanged") {
+      auto coords = deck_out.GetVector<double>("mesh", "coords");
+      REQUIRE(coords.size() == 3);
+      FLOAT_REQUIRE(coords[0], 10.0);
+      FLOAT_REQUIRE(coords[1], 20.0);
+      FLOAT_REQUIRE(coords[2], 3.0);
+    }
+    THEN("print outputs 10 and 20") {
+      REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("10"));
+      REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("20"));
+    }
+  }
+}
+
+TEST_CASE("Deck - Global variable element and slice redefinition before any suit") {
+  GIVEN("A deck where vector element and slice updates happen before any suit declaration") {
+    Rummy::Deck deck_out;
+    std::string output = captureStdout([&deck_out] {
+      std::stringstream ss;
+      ss << "mesh.coords = 1, 2, 3, 4\n"
+         << "mesh.coords[2] = 99\n"          // single element update
+         << "mesh.coords[:2] = [10, 20]\n"   // slice update
+         << "print(mesh.coords[0])\n"
+         << "print(mesh.coords[1])\n"
+         << "print(mesh.coords[2])\n";
+      deck_out.Build(ss);
+    });
+
+    THEN("mesh.coords has all updates applied") {
+      auto coords = deck_out.GetVector<double>("mesh", "coords");
+      REQUIRE(coords.size() == 4);
+      FLOAT_REQUIRE(coords[0], 10.0);
+      FLOAT_REQUIRE(coords[1], 20.0);
+      FLOAT_REQUIRE(coords[2], 99.0);
+      FLOAT_REQUIRE(coords[3], 4.0);
+    }
+    THEN("print outputs reflect updates") {
+      REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("10"));
+      REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("20"));
+      REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("99"));
+    }
+  }
+}
