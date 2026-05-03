@@ -256,27 +256,14 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
         for (size_t idx = 0; idx < expanded_names.size(); idx++) {
           const std::string &ename  = expanded_names[idx];
           const std::string &evalue = expanded_values[idx];
-          // note no var
           std::string expr = ename + " = " + evalue;
           if (vm.interpret(expr.c_str(), '\n', locals) != pips::InterpretResult::OK) {
             std::stringstream msg;
             msg << "Failed to compile dotted slice assignment '" << expr << "' at line " << line_num;
             fatal(msg);
           }
-          auto last_dot_e = ename.rfind('.');
-          std::string tsuit_dotted = ename.substr(0, last_dot_e);
-          std::string tcard        = ename.substr(last_dot_e + 1);
-          std::string tsuit        = tsuit_dotted;
-          std::replace(tsuit.begin(), tsuit.end(), '.', '/');
-          auto evalue_pips = vm.globals[ename.c_str()];
-          if (deck.find(tsuit) != deck.end() &&
-              deck[tsuit].find(tcard) != deck[tsuit].end()) {
-            auto &existing = deck[tsuit][tcard];
-            Card updated(existing.suit, existing.name, evalue_pips, existing.GetComment(), existing.loc);
-            UpdateCard(tsuit, tcard, updated, "");
-            locations[ename.c_str()] = line_num;
-            comments[ename.c_str()] = comment;
-          }
+          locations[ename.c_str()] = line_num;
+          comments[ename.c_str()] = comment;
         }
         comment.clear();
         continue;
@@ -287,23 +274,9 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
         msg << "Failed to compile dotted assignment '" << expr << "' at line " << line_num;
         fatal(msg);
       }
-      // Sync the updated value back into the deck map.
-      // Split on the last '.' to find target suit and card name.
-      auto last_dot = local_name.rfind('.');
-      std::string target_suit_dotted = local_name.substr(0, last_dot);
-      std::string target_card       = local_name.substr(last_dot + 1);
-      std::string target_suit       = target_suit_dotted;
-      std::replace(target_suit.begin(), target_suit.end(), '.', '/');
-      auto value = vm.globals[local_name.c_str()];
-      if (deck.find(target_suit) != deck.end() &&
-          deck[target_suit].find(target_card) != deck[target_suit].end()) {
-        auto &existing = deck[target_suit][target_card];
-        Card updated(existing.suit, existing.name, value, existing.GetComment(), existing.loc);
-        UpdateCard(target_suit, target_card, updated, comment);
-        locations[local_name.c_str()] = line_num;
-        comments[local_name.c_str()] = comment;
-        comment.clear();
-      }
+      locations[local_name.c_str()] = line_num;
+      comments[local_name.c_str()] = comment;
+      comment.clear();
       continue;
     }
 
