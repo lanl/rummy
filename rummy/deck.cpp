@@ -233,45 +233,56 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
     }
 
     // Variable updates
-    if (local_name.find('.') != std::string::npos) {
+    {
       auto lb = local_name.find('[');
-      bool is_dotted_slice = (lb != std::string::npos) &&
-                             (local_name.find(':', lb) != std::string::npos);
-      if (is_dotted_slice) {
-        auto expanded_names  = SplitString(local_name, line_num);
-        auto expanded_values = SplitString(card_value_stripped, line_num);
-        if (expanded_names.size() > expanded_values.size()) {
-          std::stringstream msg;
-          msg << "More slice targets than values in dotted assignment at line " << line_num;
-          fatal(msg);
-        }
-        for (size_t idx = 0; idx < expanded_names.size(); idx++) {
-          const std::string &ename  = expanded_names[idx];
-          const std::string &evalue = expanded_values[idx];
-          std::string expr = ename + " = " + evalue;
-          if (vm.interpret(expr.c_str(), '\n', locals) != pips::InterpretResult::OK) {
+      bool is_dotted = (local_name.find('.') != std::string::npos);
+      bool is_slice   = is_dotted && (lb != std::string::npos) &&
+                        (local_name.find(':', lb) != std::string::npos);
+      std::string slice_base = is_slice ? local_name.substr(0, lb) : "";
+      bool is_dotted_update =
+          is_dotted &&
+          (vm.globals.find(local_name) != vm.globals.end() ||
+           (is_slice && vm.globals.find(slice_base + "[0]") != vm.globals.end()));
+      if (is_dotted_update) {
+        if (is_slice) {
+          auto expanded_names  = SplitString(local_name, line_num);
+          auto expanded_values = SplitString(card_value_stripped, line_num);
+          if (expanded_names.size() > expanded_values.size()) {
             std::stringstream msg;
-            msg << "Failed to compile dotted slice assignment '" << expr << "' at line " << line_num;
+            msg << "More slice targets than values in dotted assignment at line " << line_num;
             fatal(msg);
           }
-          locations[ename.c_str()] = line_num;
-          comments[ename.c_str()] = comment;
+          for (size_t idx = 0; idx < expanded_names.size(); idx++) {
+            const std::string &ename  = expanded_names[idx];
+            const std::string &evalue = expanded_values[idx];
+            std::string expr = ename + " = " + evalue;
+            if (vm.interpret(expr.c_str(), '\n', locals) != pips::InterpretResult::OK) {
+              std::stringstream msg;
+              msg << "Failed to compile dotted slice assignment '" << expr << "' at line " << line_num;
+              fatal(msg);
+            }
+            locals[ename.c_str()] = vm.globals[ename.c_str()];
+            locations[ename.c_str()] = line_num;
+            comments[ename.c_str()] = comment;
+          }
+          comment.clear();
+          continue;
         }
+        std::string expr = local_name + " = " + card_value;
+        if (vm.interpret(expr.c_str(), '\n', locals) != pips::InterpretResult::OK) {
+          std::stringstream msg;
+          msg << "Failed to compile dotted assignment '" << expr << "' at line " << line_num;
+          fatal(msg);
+        }
+        locals[local_name.c_str()] = vm.globals[local_name.c_str()];
+        locations[local_name.c_str()] = line_num;
+        comments[local_name.c_str()] = comment;
         comment.clear();
         continue;
       }
-      std::string expr = local_name + " = " + card_value;
-      if (vm.interpret(expr.c_str(), '\n', locals) != pips::InterpretResult::OK) {
-        std::stringstream msg;
-        msg << "Failed to compile dotted assignment '" << expr << "' at line " << line_num;
-        fatal(msg);
-      }
-      locations[local_name.c_str()] = line_num;
-      comments[local_name.c_str()] = comment;
-      comment.clear();
-      continue;
-    } else {
-      // Add this card to the card map
+    }
+    // Add this card to the card map
+    {
       auto bracket = local_name.find('[');
       std::string base_name = (bracket != std::string::npos) ? local_name.substr(0, bracket) : local_name;
       const std::string &map_suit = curr_suit.empty() ? "/" : curr_suit;
