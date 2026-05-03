@@ -219,7 +219,7 @@ class Deck {
 
   bool IsCardVector(const std::string &suit, const std::string &name) const;
   template <typename T>
-  std::vector<T> GetVector_(const std::string &suit, const std::string &name, 
+  std::vector<T> GetVector(const std::string &suit, const std::string &name, 
                            std::vector<std::string> &comments) const {
     // Deck stores vectors as separate cards with names of suit.name[index]
     std::string vname = name + "[";
@@ -242,7 +242,7 @@ class Deck {
   template <typename T>
   std::vector<T> GetVector(const std::string &suit, const std::string &name) const {
     std::vector<std::string> comments;
-    return GetVector_<T>(suit, name, comments);
+    return GetVector<T>(suit, name, comments);
   }
   template <typename T>
   void UpdateVector(const std::string &suit, const std::string &name,
