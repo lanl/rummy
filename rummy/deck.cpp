@@ -170,6 +170,7 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
       if (deck.find(curr_suit) == deck.end()) {
         deck[curr_suit] = std::map<std::string, Card>();
         suits.push_back(curr_suit);
+        card_map[curr_suit] = std::vector<std::string>();
       }
       locals.clear();
       continue;
@@ -177,8 +178,17 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
 
     // Actual card line
     // split the line into card = val
-    auto eq_char = line.find_first_of("=");
+    // Find the first '=' that is not inside a quoted string
+    auto eq_char = std::string::npos;
+    {
+      bool in_quotes = false;
+      for (size_t i = first_char; i < line.size(); ++i) {
+        if (line[i] == '"') in_quotes = !in_quotes;
+        else if (!in_quotes && line[i] == '=') { eq_char = i; break; }
+      }
+    }
     if (eq_char == std::string::npos) {
+      // this is a pips statement
       if (vm.interpret(line.c_str(), '\n', locals) != pips::InterpretResult::OK) {
         std::stringstream msg;
         msg << "Failed to compile expression '" << line << "' at line " << line_num;
@@ -191,8 +201,14 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
     std::string local_name = line.substr(first_char, eq_char - first_char);
     // remove whitespace from local_name
     RemoveWhitespace(local_name);
-
     EmptyCheck(local_name, line_num);
+
+    // add card name to suit list
+    if (std::find(card_map[curr_suit].begin(), card_map[curr_suit].end(), local_name) ==
+        card_map[curr_suit].end()) {
+      card_map[curr_suit].push_back(local_name);
+    }
+
     std::string card_value = line.substr(eq_char + 1);
     EmptyCheck(card_value, line_num);
     // Trim leading/trailing whitespace only — preserve internal spacing
@@ -522,6 +538,12 @@ void Deck::UpdateCard(const std::string &suit, const std::string &name,
   } 
 }
 // functions to iterate over the deck
+std::vector<std::string> Deck::GetCardsInOrder(const std::string &suit) const {
+  if (card_map.find(suit) != card_map.end()) {
+    return card_map.at(suit);
+  }
+  return {};
+}
 // FindSuit returns a map of cards that match the suit
 std::map<std::string, Card> Deck::FindSuit(const std::string &suit) const {
   auto it = deck.find(suit);
@@ -597,6 +619,17 @@ bool Deck::DoesCardExist(const std::string &suit, const std::string &name) const
   // Be careful of vectors
   return (suit_it->second.find(name) != suit_it->second.end()) || 
          (suit_it->second.find(name + "[0]") != suit_it->second.end());
+}
+bool Deck::IsCardVector(const std::string &suit, const std::string &name) const {
+  auto suit_it = deck.find(suit);
+  if (suit_it == deck.end()) return false;
+  // one of the cards must be the first element
+  for (const auto &card : suit_it->second) {
+    if (card.first == name + "[0]") {
+      return true;
+    }
+  }
+  return false;
 }
 void Deck::WriteDeck(std::ostream &os) const {
   for (const auto &suit_name : suits) {

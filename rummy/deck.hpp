@@ -132,11 +132,12 @@ class Card {
 class Deck {
  public:
   Deck() = default;
-  Deck(const Deck &other) : deck(other.deck), suits(other.suits), vm(other.vm) {}
+  Deck(const Deck &other) : deck(other.deck), suits(other.suits), card_map(other.card_map), vm(other.vm) {}
   Deck &operator=(const Deck &other) {
     if (this != &other) {
       deck = other.deck;
       suits = other.suits;
+      card_map = other.card_map;
       vm = other.vm;
     }
     return *this;
@@ -160,6 +161,7 @@ class Deck {
     if (deck.find(suit) == deck.end()) {
       deck[suit] = std::map<std::string, Card>();
       suits.push_back(suit);
+      card_map[suit] = std::vector<std::string>();
     }
     if constexpr (std::is_same_v<T, Card>) {
       deck[suit][name] = val;
@@ -213,9 +215,12 @@ class Deck {
   bool DoesSuitExist(const std::string &suit) const;
   bool DoesCardExist(const std::string &suit, const std::string &name) const;
   std::vector<std::string> GetSuitsInOrder() const { return suits; }
-  
+  std::vector<std::string> GetCardsInOrder(const std::string &suit)  const;
+
+  bool IsCardVector(const std::string &suit, const std::string &name) const;
   template <typename T>
-  std::vector<T> GetVector(const std::string &suit, const std::string &name) const {
+  std::vector<T> GetVector_(const std::string &suit, const std::string &name, 
+                           std::vector<std::string> &comments) const {
     // Deck stores vectors as separate cards with names of suit.name[index]
     std::string vname = name + "[";
     auto cards = FindCardFuzzy(suit, vname);
@@ -230,8 +235,14 @@ class Deck {
     vec.reserve(cards.size());
     for (size_t i = 0; i < cards.size(); i++) {
       vec.push_back(cards[i].Get<T>());
+      comments.push_back(cards[i].GetComment());
     }
     return vec;
+  }
+  template <typename T>
+  std::vector<T> GetVector(const std::string &suit, const std::string &name) const {
+    std::vector<std::string> comments;
+    return GetVector_<T>(suit, name, comments);
   }
   template <typename T>
   void UpdateVector(const std::string &suit, const std::string &name,
@@ -269,6 +280,7 @@ class Deck {
   pips::VM vm;
   std::map<std::string, std::map<std::string, Card>> deck = {{"/", {}}};
   std::vector<std::string> suits = {"/"}; // suits in order
+  std::map<std::string, std::vector<std::string>> card_map; // cards in order 
 };
 
 } // namespace Rummy
