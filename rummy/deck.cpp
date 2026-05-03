@@ -207,15 +207,7 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
     // Strip any [...] suffix so that slice assignments like v[:3] are stored
     // under the base name "v", matching the individual element cards v[0], v[1], ...
     // Globals have an empty curr_suit but are stored under "/" in the deck.
-    {
-      auto bracket = local_name.find('[');
-      std::string base_name = (bracket != std::string::npos) ? local_name.substr(0, bracket) : local_name;
-      const std::string &map_suit = curr_suit.empty() ? "/" : curr_suit;
-      if (std::find(card_map[map_suit].begin(), card_map[map_suit].end(), base_name) ==
-          card_map[map_suit].end()) {
-        card_map[map_suit].push_back(base_name);
-      }
-    }
+    
 
     std::string card_value = line.substr(eq_char + 1);
     EmptyCheck(card_value, line_num);
@@ -241,7 +233,7 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
     }
 
     // Variable updates
-    if (!curr_suit.empty() && local_name.find('.') != std::string::npos) {
+    if (local_name.find('.') != std::string::npos) {
       auto lb = local_name.find('[');
       bool is_dotted_slice = (lb != std::string::npos) &&
                              (local_name.find(':', lb) != std::string::npos);
@@ -278,6 +270,15 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
       comments[local_name.c_str()] = comment;
       comment.clear();
       continue;
+    } else {
+      // Add this card to the card map
+      auto bracket = local_name.find('[');
+      std::string base_name = (bracket != std::string::npos) ? local_name.substr(0, bracket) : local_name;
+      const std::string &map_suit = curr_suit.empty() ? "/" : curr_suit;
+      if (std::find(card_map[map_suit].begin(), card_map[map_suit].end(), base_name) ==
+          card_map[map_suit].end()) {
+        card_map[map_suit].push_back(base_name);
+      }
     }
 
     // Processing the card
