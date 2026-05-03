@@ -19,6 +19,7 @@
 
 #include "deck.hpp"
 #include <sstream>
+#include <unistd.h>
 
 #define FLOAT_REQUIRE(a, b) REQUIRE_THAT(a, Catch::Matchers::WithinAbs(b, 1e-16))
 #define FLOAT_REQUIRE_TOL(a, b, tol) REQUIRE_THAT(a, Catch::Matchers::WithinAbs(b, tol))
@@ -858,6 +859,96 @@ TEST_CASE("pips - Math functions") {
     THEN("min and max are correct") {
       FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "mn"), 3.0, 1e-12);
       FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "mx"), 7.0, 1e-12);
+    }
+  }
+}
+
+// Helper: redirect stdout to a pipe, run f(), restore stdout, return captured text.
+static std::string captureStdout(std::function<void()> f) {
+  int pipefd[2];
+  pipe(pipefd);
+  int saved = dup(STDOUT_FILENO);
+  dup2(pipefd[1], STDOUT_FILENO);
+  close(pipefd[1]);
+
+  f();
+  fflush(stdout);
+
+  dup2(saved, STDOUT_FILENO);
+  close(saved);
+
+  std::string result;
+  char buf[256];
+  ssize_t n;
+  while ((n = read(pipefd[0], buf, sizeof(buf))) > 0)
+    result.append(buf, n);
+  close(pipefd[0]);
+  return result;
+}
+
+TEST_CASE("pips - print() function") {
+  GIVEN("A deck that calls print() on various types") {
+    std::string output = captureStdout([] {
+      Rummy::Deck deck;
+      std::stringstream ss;
+      ss << "num = 42\n"
+         << "<out>\n"
+         << "flt = 3.5\n"
+         << "boo = true\n"
+         << "str = \"hello\"\n"
+         << "print(\"num =\", num)\n"
+         << "print(\"flt =\", out.flt)\n"
+         << "print(\"boo =\", out.boo)\n"
+         << "print(\"str =\", out.str)\n";
+      deck.Build(ss);
+    });
+
+    THEN("Each printed value appears on its own line") {
+      REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("num = 42"));
+      REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("flt = 3.5"));
+      REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("boo = true"));
+      REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("str = hello"));
+    }
+  }
+
+  GIVEN("A deck that calls print() with multiple arguments") {
+    std::string output = captureStdout([] {
+      Rummy::Deck deck;
+      std::stringstream ss;
+      ss << "<out>\n"
+         << "a = 1\n"
+         << "b = 2\n"
+         << "print(\"a =\", out.a, \",\", \"b =\", out.b)\n";
+      deck.Build(ss);
+    });
+
+    THEN("Both values appear in the output") {
+      REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("a = 1 , b = 2"));
+    }
+  }
+}
+
+TEST_CASE("pips - __globals__ command") {
+  GIVEN("A deck with several variables followed by __globals__") {
+    std::string output = captureStdout([] {
+      Rummy::Deck deck;
+      std::stringstream ss;
+      ss << "speed = 42\n"
+         << "label = \"fast\"\n"
+         << "<suit1>\n"
+         << "flag  = true\n"
+         << "__globals__\n";
+      deck.Build(ss);
+    });
+
+    THEN("Output begins with 'Globals:'") {
+      REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("Globals:"));
+    }
+    THEN("Each declared variable appears in the output") {
+      REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("speed = 42"));
+      REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("label = fast"));
+      REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("suit1.flag = true"));
+      REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("flag = true"));
     }
   }
 }
