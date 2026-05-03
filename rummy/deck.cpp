@@ -204,9 +204,17 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
     EmptyCheck(local_name, line_num);
 
     // add card name to suit list
-    if (std::find(card_map[curr_suit].begin(), card_map[curr_suit].end(), local_name) ==
-        card_map[curr_suit].end()) {
-      card_map[curr_suit].push_back(local_name);
+    // Strip any [...] suffix so that slice assignments like v[:3] are stored
+    // under the base name "v", matching the individual element cards v[0], v[1], ...
+    // Globals have an empty curr_suit but are stored under "/" in the deck.
+    {
+      auto bracket = local_name.find('[');
+      std::string base_name = (bracket != std::string::npos) ? local_name.substr(0, bracket) : local_name;
+      const std::string &map_suit = curr_suit.empty() ? "/" : curr_suit;
+      if (std::find(card_map[map_suit].begin(), card_map[map_suit].end(), base_name) ==
+          card_map[map_suit].end()) {
+        card_map[map_suit].push_back(base_name);
+      }
     }
 
     std::string card_value = line.substr(eq_char + 1);
@@ -445,9 +453,13 @@ void Deck::Build(std::istream &ss) {
       }
     }
   }
+  // Ensure the global "/" suit exists
+  if (deck.find("/") == deck.end()) {
+    deck["/"] = std::map<std::string, Card>();
+    suits.push_back("/");
+    card_map["/"] = std::vector<std::string>();
+  }
   CompileInput(ss, locations, comments);
-
-  
 
   for (auto global : vm.globals) {
     const int loc = locations[global.first];
