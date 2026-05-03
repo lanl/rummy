@@ -234,7 +234,12 @@ class Deck {
     std::vector<T> vec;
     vec.reserve(cards.size());
     for (size_t i = 0; i < cards.size(); i++) {
-      vec.push_back(cards[i].Get<T>());
+      if constexpr (std::is_same_v<T, std::string>) {
+        // GetString() handles numeric and bool values; Get<string>() rejects them.
+        vec.push_back(cards[i].GetString());
+      } else {
+        vec.push_back(cards[i].Get<T>());
+      }
       comments.push_back(cards[i].GetComment());
     }
     return vec;
