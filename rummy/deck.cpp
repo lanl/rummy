@@ -15,11 +15,13 @@
 
 
 #include <algorithm>
+#include <filesystem>
 #include <fstream>
 #include <functional>
 #include <iostream>
 #include <map>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -36,9 +38,10 @@ void Deck::Build(std::string fname, std::string prepends) {
   Build(pss);
   std::ifstream input(fname);
   if (input.is_open()) {
+    std::string base_dir = std::filesystem::path(fname).parent_path().string();
     std::stringstream ss;
     ss << input.rdbuf();
-    Build(ss);
+    BuildInternal(ss, base_dir);
   } else {
     std::stringstream msg;
     msg << "Could not open file '" << fname << "'";
@@ -58,16 +61,16 @@ void Deck::Build(std::istream &ss, std::istream &prepends) {
   Build(ss);
 }
 
-void Deck::CompileInput(std::istream &ss, std::map<std::string, CardMeta> &meta) {
-  pips::VTable locals;
+void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta,
+                         const std::string &base_dir, std::set<std::string> &include_stack,
+                         pips::VTable &locals, std::string &curr_suit,
+                         std::string &prev_suit) {
   std::string line;
   std::string comment;
   std::string multiline;
   bool line_continue = false;
 
   int line_num = 0;
-  std::string curr_suit;
-  std::string prev_suit;
   while (std::getline(ss, line)) {
     line_num++;
     // remove all \t\f\n\r\v but leave pure spaces in case of a string containing spaces
@@ -135,6 +138,56 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, CardMeta> &meta)
 
         multiline.clear();
         line_continue = false;
+      }
+    }
+
+    // include statement
+    if (line.compare(first_char, 7, "include") == 0) {
+      const size_t after_kw = first_char + 7;
+      if (after_kw < line.size() && (line[after_kw] == ' ' || line[after_kw] == '"')) {
+        auto quote_open = line.find('"', after_kw);
+        auto quote_close = (quote_open != std::string::npos) ? line.find('"', quote_open + 1)
+                                                              : std::string::npos;
+        if (quote_open == std::string::npos || quote_close == std::string::npos) {
+          std::stringstream msg;
+          msg << "Malformed include statement at line " << line_num;
+          fatal(msg);
+        }
+        std::string inc_path = line.substr(quote_open + 1, quote_close - quote_open - 1);
+        if (inc_path.empty()) {
+          std::stringstream msg;
+          msg << "Empty filename in include statement at line " << line_num;
+          fatal(msg);
+        }
+        std::filesystem::path resolved(inc_path);
+        if (resolved.is_relative() && !base_dir.empty()) {
+          resolved = std::filesystem::path(base_dir) / resolved;
+        }
+        std::error_code ec;
+        auto canonical = std::filesystem::canonical(resolved, ec);
+        if (ec) {
+          std::stringstream msg;
+          msg << "Cannot resolve include file '" << inc_path << "' at line " << line_num;
+          fatal(msg);
+        }
+        const std::string canonical_str = canonical.string();
+        if (include_stack.count(canonical_str)) {
+          std::stringstream msg;
+          msg << "Circular include detected: '" << inc_path << "' at line " << line_num;
+          fatal(msg);
+        }
+        std::ifstream inc_stream(canonical_str);
+        if (!inc_stream.is_open()) {
+          std::stringstream msg;
+          msg << "Cannot open include file '" << inc_path << "' at line " << line_num;
+          fatal(msg);
+        }
+        include_stack.insert(canonical_str);
+        const std::string inc_base_dir = canonical.parent_path().string();
+        CompileStream(inc_stream, meta, inc_base_dir, include_stack, locals, curr_suit,
+                      prev_suit);
+        include_stack.erase(canonical_str);
+        continue;
       }
     }
 
@@ -470,11 +523,18 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, CardMeta> &meta)
   } // end while
 }
 
-void Deck::Build(std::istream &ss) {
+void Deck::CompileInput(std::istream &ss, std::map<std::string, CardMeta> &meta,
+                        const std::string &base_dir) {
+  pips::VTable locals;
+  std::string curr_suit;
+  std::string prev_suit;
+  std::set<std::string> include_stack;
+  CompileStream(ss, meta, base_dir, include_stack, locals, curr_suit, prev_suit);
+}
 
-  // TODO:
-  // Support include statements
+void Deck::Build(std::istream &ss) { BuildInternal(ss, ""); }
 
+void Deck::BuildInternal(std::istream &ss, const std::string &base_dir) {
   std::map<std::string, CardMeta> meta;
 
   if (!deck.empty()) {
@@ -500,7 +560,7 @@ void Deck::Build(std::istream &ss) {
     suits.push_back("/");
     card_map["/"] = std::vector<std::string>();
   }
-  CompileInput(ss, meta);
+  CompileInput(ss, meta, base_dir);
 
   for (auto global : vm.globals) {
     const int loc = meta[global.first].loc;
