@@ -144,11 +144,10 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
     // include statement
     if (line.compare(first_char, 7, "include") == 0) {
       const size_t after_kw = first_char + 7;
-      if (after_kw < line.size() && (line[after_kw] == ' ' || line[after_kw] == '"')) {
-        auto quote_open = line.find('"', after_kw);
-        auto quote_close = (quote_open != std::string::npos) ? line.find('"', quote_open + 1)
-                                                              : std::string::npos;
-        if (quote_open == std::string::npos || quote_close == std::string::npos) {
+      const size_t quote_open = line.find_first_not_of(" ", after_kw);
+      if (quote_open != std::string::npos && line[quote_open] == '"') {
+        auto quote_close = line.find('"', quote_open + 1);
+        if (quote_close == std::string::npos) {
           std::stringstream msg;
           msg << "Malformed include statement at line " << line_num;
           fatal(msg);
@@ -189,7 +188,7 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
         include_stack.erase(canonical_str);
         continue;
       }
-    }
+    } // include statement
 
     // start of a new suit
     // TODO define the start and end characters in cmake
