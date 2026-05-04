@@ -129,6 +129,11 @@ class Card {
   bool initialized;
 };
 
+struct CardMeta {
+  int loc = -1;
+  std::string comment;
+};
+
 class Deck {
  public:
   Deck() = default;
@@ -146,8 +151,7 @@ class Deck {
   void Build(std::istream &ss);
   void Build(std::istream &ss, std::string prepends);
   void Build(std::istream &ss, std::istream &prepends);
-  void CompileInput(std::istream &ss, std::map<std::string, int> &locations,
-                    std::map<std::string, std::string> &comments);
+  void CompileInput(std::istream &ss, std::map<std::string, CardMeta> &meta);
 
   const std::map<std::string, Card> &GetSuit(const std::string &suit) const {
     return deck.at(suit);

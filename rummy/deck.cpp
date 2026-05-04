@@ -58,7 +58,7 @@ void Deck::Build(std::istream &ss, std::istream &prepends) {
   Build(ss);
 }
 
-void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations, std::map<std::string, std::string> &comments) {
+void Deck::CompileInput(std::istream &ss, std::map<std::string, CardMeta> &meta) {
   pips::VTable locals;
   std::string line;
   std::string comment;
@@ -262,8 +262,7 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
               fatal(msg);
             }
             locals[ename.c_str()] = vm.globals[ename.c_str()];
-            locations[ename.c_str()] = line_num;
-            comments[ename.c_str()] = comment;
+            meta[ename.c_str()] = {line_num, comment};
           }
           comment.clear();
           continue;
@@ -275,8 +274,7 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
           fatal(msg);
         }
         locals[local_name.c_str()] = vm.globals[local_name.c_str()];
-        locations[local_name.c_str()] = line_num;
-        comments[local_name.c_str()] = comment;
+        meta[local_name.c_str()] = {line_num, comment};
         comment.clear();
         continue;
       }
@@ -383,8 +381,7 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
         fatal(msg);
       }
       auto value = vm.globals[global_name.c_str()];
-      locations[global_name.c_str()] = line_num;
-      comments[global_name.c_str()] = comment;
+      meta[global_name.c_str()] = {line_num, comment};
       comment.clear();
       // Stash the local for this suit
       locals[local_name.c_str()] = value;
@@ -430,8 +427,7 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
           fatal(msg);
         }
         auto vec_value = vm.globals[vec_name.c_str()];
-        locations[vec_name.c_str()] = line_num;
-        comments[vec_name.c_str()] = comment;
+        meta[vec_name.c_str()] = {line_num, comment};
         comment.clear();
         // Stash the local for this suit
         std::string local_vec_name = local_name + "[" + std::to_string(index) + "]";
@@ -464,8 +460,7 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
           fatal(msg);
         }
         auto value = vm.globals[global_vec_name.c_str()];
-        locations[global_vec_name.c_str()] = line_num;
-        comments[global_vec_name.c_str()] = comment;
+        meta[global_vec_name.c_str()] = {line_num, comment};
         comment.clear();
         // Stash the local for this suit
         locals[local_vec_name.c_str()] = value;
@@ -480,11 +475,7 @@ void Deck::Build(std::istream &ss) {
   // TODO:
   // Support include statements
 
-
-  // TODO:
-  //   combine comment and location into a metadata struct 
-  std::map<std::string, int> locations;
-  std::map<std::string, std::string> comments;
+  std::map<std::string, CardMeta> meta;
 
   if (!deck.empty()) {
     for (const auto &suit : deck) {
@@ -493,14 +484,12 @@ void Deck::Build(std::istream &ss) {
         std::string suit_name = suit.first;
         if (suit_name == "/") {
           vm.globals[card.first] = card.second.GetValue();
-          locations[card.first] = card.second.loc;
-          comments[card.first] = card.second.GetComment();
+          meta[card.first] = {card.second.loc, card.second.GetComment()};
         } else {
           std::replace(suit_name.begin(), suit_name.end(), '/', '.');
           // use suit name as prefix
           vm.globals[suit_name + "." + card.first] = card.second.GetValue();
-          locations[suit_name + "." + card.first] = card.second.loc;
-          comments[suit_name + "." + card.first] = card.second.GetComment();
+          meta[suit_name + "." + card.first] = {card.second.loc, card.second.GetComment()};
         }
       }
     }
@@ -511,11 +500,11 @@ void Deck::Build(std::istream &ss) {
     suits.push_back("/");
     card_map["/"] = std::vector<std::string>();
   }
-  CompileInput(ss, locations, comments);
+  CompileInput(ss, meta);
 
   for (auto global : vm.globals) {
-    const int loc = locations[global.first];
-    const auto comment = comments[global.first];
+    const int loc = meta[global.first].loc;
+    const auto comment = meta[global.first].comment;
     // find position of the last dot
     const auto last_dot = global.first.find_last_of('.');
     std::string suit, card_name;
