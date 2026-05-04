@@ -62,6 +62,8 @@ class Card {
   template <typename T>
   Card(std::string suit, std::string name, const T &v, std::string comment, int loc = -1)
       : loc(loc), suit(suit), name(name), value(pips::Value(v)), comment(comment), initialized(true) {}
+  Card(std::string suit, std::string name, pips::Value v, std::string comment, int loc = -1)
+      : loc(loc), suit(suit), name(name), value(v), comment(comment), initialized(true) {}
 
   bool empty() const { return !initialized; }
   bool isBool() const { return value.type == pips::ValueType::BOOL; }
@@ -286,6 +288,33 @@ class Deck {
   void RecompileCard(const std::string &line);
   void UpdateDeck();
   void WriteDeck(std::ostream &os) const;
+
+  // Seed the deck
+  void SeedGlobals(const std::map<std::string, std::map<std::string, Card>> &new_cards,
+                   const std::vector<std::string> &new_suits,
+                   const std::map<std::string, std::vector<std::string>> &new_card_map) {
+    // Merge suits in the order supplied.
+    for (const auto &suit : new_suits) {
+      if (deck.find(suit) == deck.end()) {
+        deck[suit] = {};
+        suits.push_back(suit);
+        card_map[suit] = {};
+      }
+    }
+    // Merge card ordering.
+    for (const auto &[suit, names] : new_card_map) {
+      auto &cm = card_map[suit];
+      for (const auto &card_name : names) {
+        if (std::find(cm.begin(), cm.end(), card_name) == cm.end())
+          cm.push_back(card_name);
+      }
+    }
+    for (const auto &[suit, cards] : new_cards) {
+      for (const auto &[card_name, card] : cards) {
+        deck[suit][card_name] = card;
+      }
+    }
+  }
 
  private:
   void BuildInternal(std::istream &ss, const std::string &base_dir);
