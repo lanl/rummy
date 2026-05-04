@@ -1092,14 +1092,16 @@ TEST_CASE("Deck - Include Statement") {
     {
       std::ofstream f(tmp / "included.in");
       f << "<suit2>\n"
-        << "card3 = 100\n";
+        << "card3 = 100\n"
+        << "include_dir = \"subdir\"\n"
+        << "include = 50 #comment\n"; // should not conflict with include keyword
     }
     {
       std::ofstream f(tmp / "main.in");
       f << "global1 = 42\n"
         << "<suit1>\n"
         << "card1 = global1\n"
-        << "include \"included.in\"\n";
+        << "include \"included.in\" # comment\n";
     }
 
     Rummy::Deck deck;
@@ -1112,6 +1114,8 @@ TEST_CASE("Deck - Include Statement") {
     THEN("Cards from the included file are present") {
       REQUIRE(deck.DoesSuitExist("suit2"));
       FLOAT_REQUIRE(deck.GetCardValue<double>("suit2", "card3"), 100.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("suit2", "include"), 50.0);
+      REQUIRE(deck.GetCardValue<std::string>("suit2", "include_dir") == "subdir");
     }
 
     fs::remove_all(tmp);
