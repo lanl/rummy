@@ -15,11 +15,13 @@
 
 
 #include <algorithm>
+#include <filesystem>
 #include <fstream>
 #include <functional>
 #include <iostream>
 #include <map>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -36,9 +38,10 @@ void Deck::Build(std::string fname, std::string prepends) {
   Build(pss);
   std::ifstream input(fname);
   if (input.is_open()) {
+    std::string base_dir = std::filesystem::path(fname).parent_path().string();
     std::stringstream ss;
     ss << input.rdbuf();
-    Build(ss);
+    BuildInternal(ss, base_dir);
   } else {
     std::stringstream msg;
     msg << "Could not open file '" << fname << "'";
@@ -58,16 +61,16 @@ void Deck::Build(std::istream &ss, std::istream &prepends) {
   Build(ss);
 }
 
-void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations, std::map<std::string, std::string> &comments) {
-  pips::VTable locals;
+void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta,
+                         const std::string &base_dir, std::set<std::string> &include_stack,
+                         pips::VTable &locals, std::string &curr_suit,
+                         std::string &prev_suit) {
   std::string line;
   std::string comment;
   std::string multiline;
   bool line_continue = false;
 
-  int line_num = -1;
-  std::string curr_suit;
-  std::string prev_suit;
+  int line_num = 0;
   while (std::getline(ss, line)) {
     line_num++;
     // remove all \t\f\n\r\v but leave pure spaces in case of a string containing spaces
@@ -135,6 +138,56 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
 
         multiline.clear();
         line_continue = false;
+      }
+    }
+
+    // include statement
+    if (line.compare(first_char, 7, "include") == 0) {
+      const size_t after_kw = first_char + 7;
+      if (after_kw < line.size() && (line[after_kw] == ' ' || line[after_kw] == '"')) {
+        auto quote_open = line.find('"', after_kw);
+        auto quote_close = (quote_open != std::string::npos) ? line.find('"', quote_open + 1)
+                                                              : std::string::npos;
+        if (quote_open == std::string::npos || quote_close == std::string::npos) {
+          std::stringstream msg;
+          msg << "Malformed include statement at line " << line_num;
+          fatal(msg);
+        }
+        std::string inc_path = line.substr(quote_open + 1, quote_close - quote_open - 1);
+        if (inc_path.empty()) {
+          std::stringstream msg;
+          msg << "Empty filename in include statement at line " << line_num;
+          fatal(msg);
+        }
+        std::filesystem::path resolved(inc_path);
+        if (resolved.is_relative() && !base_dir.empty()) {
+          resolved = std::filesystem::path(base_dir) / resolved;
+        }
+        std::error_code ec;
+        auto canonical = std::filesystem::canonical(resolved, ec);
+        if (ec) {
+          std::stringstream msg;
+          msg << "Cannot resolve include file '" << inc_path << "' at line " << line_num;
+          fatal(msg);
+        }
+        const std::string canonical_str = canonical.string();
+        if (include_stack.count(canonical_str)) {
+          std::stringstream msg;
+          msg << "Circular include detected: '" << inc_path << "' at line " << line_num;
+          fatal(msg);
+        }
+        std::ifstream inc_stream(canonical_str);
+        if (!inc_stream.is_open()) {
+          std::stringstream msg;
+          msg << "Cannot open include file '" << inc_path << "' at line " << line_num;
+          fatal(msg);
+        }
+        include_stack.insert(canonical_str);
+        const std::string inc_base_dir = canonical.parent_path().string();
+        CompileStream(inc_stream, meta, inc_base_dir, include_stack, locals, curr_suit,
+                      prev_suit);
+        include_stack.erase(canonical_str);
+        continue;
       }
     }
 
@@ -262,8 +315,7 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
               fatal(msg);
             }
             locals[ename.c_str()] = vm.globals[ename.c_str()];
-            locations[ename.c_str()] = line_num;
-            comments[ename.c_str()] = comment;
+            meta[ename.c_str()] = {line_num, comment};
           }
           comment.clear();
           continue;
@@ -275,8 +327,7 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
           fatal(msg);
         }
         locals[local_name.c_str()] = vm.globals[local_name.c_str()];
-        locations[local_name.c_str()] = line_num;
-        comments[local_name.c_str()] = comment;
+        meta[local_name.c_str()] = {line_num, comment};
         comment.clear();
         continue;
       }
@@ -383,8 +434,7 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
         fatal(msg);
       }
       auto value = vm.globals[global_name.c_str()];
-      locations[global_name.c_str()] = line_num;
-      comments[global_name.c_str()] = comment;
+      meta[global_name.c_str()] = {line_num, comment};
       comment.clear();
       // Stash the local for this suit
       locals[local_name.c_str()] = value;
@@ -430,8 +480,7 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
           fatal(msg);
         }
         auto vec_value = vm.globals[vec_name.c_str()];
-        locations[vec_name.c_str()] = line_num;
-        comments[vec_name.c_str()] = comment;
+        meta[vec_name.c_str()] = {line_num, comment};
         comment.clear();
         // Stash the local for this suit
         std::string local_vec_name = local_name + "[" + std::to_string(index) + "]";
@@ -464,8 +513,7 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
           fatal(msg);
         }
         auto value = vm.globals[global_vec_name.c_str()];
-        locations[global_vec_name.c_str()] = line_num;
-        comments[global_vec_name.c_str()] = comment;
+        meta[global_vec_name.c_str()] = {line_num, comment};
         comment.clear();
         // Stash the local for this suit
         locals[local_vec_name.c_str()] = value;
@@ -475,16 +523,19 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, int> &locations,
   } // end while
 }
 
-void Deck::Build(std::istream &ss) {
+void Deck::CompileInput(std::istream &ss, std::map<std::string, CardMeta> &meta,
+                        const std::string &base_dir) {
+  pips::VTable locals;
+  std::string curr_suit;
+  std::string prev_suit;
+  std::set<std::string> include_stack;
+  CompileStream(ss, meta, base_dir, include_stack, locals, curr_suit, prev_suit);
+}
 
-  // TODO:
-  // Support include statements
+void Deck::Build(std::istream &ss) { BuildInternal(ss, ""); }
 
-
-  // TODO:
-  //   combine comment and location into a metadata struct 
-  std::map<std::string, int> locations;
-  std::map<std::string, std::string> comments;
+void Deck::BuildInternal(std::istream &ss, const std::string &base_dir) {
+  std::map<std::string, CardMeta> meta;
 
   if (!deck.empty()) {
     for (const auto &suit : deck) {
@@ -493,14 +544,12 @@ void Deck::Build(std::istream &ss) {
         std::string suit_name = suit.first;
         if (suit_name == "/") {
           vm.globals[card.first] = card.second.GetValue();
-          locations[card.first] = card.second.loc;
-          comments[card.first] = card.second.GetComment();
+          meta[card.first] = {card.second.loc, card.second.GetComment()};
         } else {
           std::replace(suit_name.begin(), suit_name.end(), '/', '.');
           // use suit name as prefix
           vm.globals[suit_name + "." + card.first] = card.second.GetValue();
-          locations[suit_name + "." + card.first] = card.second.loc;
-          comments[suit_name + "." + card.first] = card.second.GetComment();
+          meta[suit_name + "." + card.first] = {card.second.loc, card.second.GetComment()};
         }
       }
     }
@@ -511,11 +560,11 @@ void Deck::Build(std::istream &ss) {
     suits.push_back("/");
     card_map["/"] = std::vector<std::string>();
   }
-  CompileInput(ss, locations, comments);
+  CompileInput(ss, meta, base_dir);
 
   for (auto global : vm.globals) {
-    const int loc = locations[global.first];
-    const auto comment = comments[global.first];
+    const int loc = meta[global.first].loc;
+    const auto comment = meta[global.first].comment;
     // find position of the last dot
     const auto last_dot = global.first.find_last_of('.');
     std::string suit, card_name;

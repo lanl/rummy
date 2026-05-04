@@ -18,6 +18,8 @@
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 #include "deck.hpp"
+#include <filesystem>
+#include <fstream>
 #include <sstream>
 #include <unistd.h>
 
@@ -1078,5 +1080,40 @@ TEST_CASE("Deck - Global variable element and slice redefinition before any suit
       REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("20"));
       REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("99"));
     }
+  }
+}
+
+TEST_CASE("Deck - Include Statement") {
+  GIVEN("A main file that includes another file via relative path") {
+    namespace fs = std::filesystem;
+    auto tmp = fs::temp_directory_path() / "rummy_include_test";
+    fs::create_directories(tmp);
+
+    {
+      std::ofstream f(tmp / "included.in");
+      f << "<suit2>\n"
+        << "card3 = 100\n";
+    }
+    {
+      std::ofstream f(tmp / "main.in");
+      f << "global1 = 42\n"
+        << "<suit1>\n"
+        << "card1 = global1\n"
+        << "include \"included.in\"\n";
+    }
+
+    Rummy::Deck deck;
+    deck.Build((tmp / "main.in").string());
+
+    THEN("Cards from the main file are present") {
+      REQUIRE(deck.DoesSuitExist("suit1"));
+      FLOAT_REQUIRE(deck.GetCardValue<double>("suit1", "card1"), 42.0);
+    }
+    THEN("Cards from the included file are present") {
+      REQUIRE(deck.DoesSuitExist("suit2"));
+      FLOAT_REQUIRE(deck.GetCardValue<double>("suit2", "card3"), 100.0);
+    }
+
+    fs::remove_all(tmp);
   }
 }

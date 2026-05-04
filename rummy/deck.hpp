@@ -25,6 +25,7 @@
 #include <limits>
 #include <map>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <string>
 #include <variant>
@@ -129,6 +130,11 @@ class Card {
   bool initialized;
 };
 
+struct CardMeta {
+  int loc = -1;
+  std::string comment;
+};
+
 class Deck {
  public:
   Deck() = default;
@@ -146,8 +152,8 @@ class Deck {
   void Build(std::istream &ss);
   void Build(std::istream &ss, std::string prepends);
   void Build(std::istream &ss, std::istream &prepends);
-  void CompileInput(std::istream &ss, std::map<std::string, int> &locations,
-                    std::map<std::string, std::string> &comments);
+  void CompileInput(std::istream &ss, std::map<std::string, CardMeta> &meta,
+                    const std::string &base_dir = "");
 
   const std::map<std::string, Card> &GetSuit(const std::string &suit) const {
     return deck.at(suit);
@@ -282,6 +288,10 @@ class Deck {
   void WriteDeck(std::ostream &os) const;
 
  private:
+  void BuildInternal(std::istream &ss, const std::string &base_dir);
+  void CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta,
+                     const std::string &base_dir, std::set<std::string> &include_stack,
+                     pips::VTable &locals, std::string &curr_suit, std::string &prev_suit);
   pips::VM vm;
   std::map<std::string, std::map<std::string, Card>> deck = {{"/", {}}};
   std::vector<std::string> suits = {"/"}; // suits in order
