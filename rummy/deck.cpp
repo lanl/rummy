@@ -65,7 +65,7 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, CardMeta> &meta)
   std::string multiline;
   bool line_continue = false;
 
-  int line_num = -1;
+  int line_num = 0;
   std::string curr_suit;
   std::string prev_suit;
   while (std::getline(ss, line)) {
