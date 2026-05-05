@@ -24,6 +24,8 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 option(RUMMY_ENABLE_ASAN "Enable AddressSanitizer to detect memory errors" OFF)
+option(RUMMY_ENABLE_COVERAGE "Enable coverage instrumentation for ctest coverage runs" ON)
+option(RUMMY_ENABLE_UNIT_TESTS "Enable unit tests" ON)
 
 if (POLICY CMP0141)
   cmake_policy(SET CMP0141 NEW)
@@ -46,7 +48,9 @@ if(RUMMY_ENABLE_ASAN)
   add_link_options(-fsanitize=address -fsanitize=undefined)
 endif()
 
-rummy_configure_coverage()
+if(RUMMY_ENABLE_COVERAGE)
+  rummy_configure_coverage()
+endif()
 
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
   # silence sprintf warnings on mac
@@ -57,4 +61,6 @@ endif()
 add_subdirectory(external/pips pips-build)
 add_subdirectory ("rummy")
 
-rummy_add_unit_tests()
+if (RUMMY_ENABLE_UNIT_TESTS)
+  rummy_add_unit_tests()
+endif()
