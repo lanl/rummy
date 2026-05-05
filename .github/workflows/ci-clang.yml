@@ -40,7 +40,7 @@ jobs:
         run: ctest --test-dir build-clang --output-on-failure
 
       - name: Generate coverage report
-        run: cmake --build build-clang --target coverage_html
+        run: cmake --build build-clang --target rummy_coverage_html
 
       - name: Upload coverage artifacts
         uses: actions/upload-artifact@v4

@@ -17,8 +17,6 @@ include_guard(GLOBAL)
 
 include(CTest)
 
-option(RUMMY_ENABLE_COVERAGE "Enable coverage instrumentation for ctest coverage runs" ON)
-option(RUMMY_ENABLE_UNIT_TESTS "Enable unit tests" ON)
 
 function(rummy_configure_coverage)
   if(RUMMY_ENABLE_COVERAGE)
@@ -45,7 +43,7 @@ function(rummy_configure_coverage)
       ")\n"
     )
 
-    add_custom_target(coverage
+    add_custom_target(rummy_coverage
       COMMAND ${CMAKE_CTEST_COMMAND} -T Test -T Coverage --output-on-failure
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
       COMMENT "Run tests and generate CTest coverage report"
@@ -56,7 +54,7 @@ function(rummy_configure_coverage)
       set(RUMMY_COVERAGE_REPORT_DIR "${CMAKE_BINARY_DIR}/coverage")
       set(RUMMY_COVERAGE_DETAILS_HTML "${RUMMY_COVERAGE_REPORT_DIR}/coverage-details.html")
 
-      add_custom_target(coverage_html
+      add_custom_target(rummy_coverage_html
         COMMAND ${CMAKE_COMMAND} -E make_directory "${RUMMY_COVERAGE_REPORT_DIR}"
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
         COMMAND ${RUMMY_GCOVR_EXECUTABLE}

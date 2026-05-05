@@ -38,7 +38,7 @@ jobs:
         run: ctest --test-dir build-gcc --output-on-failure
 
       - name: Generate coverage report
-        run: cmake --build build-gcc --target coverage_html
+        run: cmake --build build-gcc --target rummy_coverage_html
 
       - name: Upload coverage artifacts
         uses: actions/upload-artifact@v4
