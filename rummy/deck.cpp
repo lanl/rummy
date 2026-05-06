@@ -13,7 +13,6 @@
 
 // This file was created in part with generative AI
 
-
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
@@ -62,9 +61,9 @@ void Deck::Build(std::istream &ss, std::istream &prepends) {
 }
 
 void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta,
-                         const std::string &base_dir, std::set<std::string> &include_stack,
-                         pips::VTable &locals, std::string &curr_suit,
-                         std::string &prev_suit) {
+                         const std::string &base_dir,
+                         std::set<std::string> &include_stack, pips::VTable &locals,
+                         std::string &curr_suit, std::string &prev_suit) {
   std::string line;
   std::string comment;
   std::string multiline;
@@ -99,7 +98,8 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
         // preserve the comment
         this_comment = line.substr(last_comment + 1);
         line = line.substr(0, last_comment);
-        this_comment.erase(std::remove(this_comment.begin(), this_comment.end(), '&'), this_comment.end());
+        this_comment.erase(std::remove(this_comment.begin(), this_comment.end(), '&'),
+                           this_comment.end());
         RemoveLeadingWhitespace(this_comment);
         RemoveTrailingWhitespace(this_comment);
         if (line_continue && !this_comment.empty()) {
@@ -235,8 +235,12 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
     {
       bool in_quotes = false;
       for (size_t i = first_char; i < line.size(); ++i) {
-        if (line[i] == '"') in_quotes = !in_quotes;
-        else if (!in_quotes && line[i] == '=') { eq_char = i; break; }
+        if (line[i] == '"')
+          in_quotes = !in_quotes;
+        else if (!in_quotes && line[i] == '=') {
+          eq_char = i;
+          break;
+        }
       }
     }
     if (eq_char == std::string::npos) {
@@ -259,7 +263,6 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
     // Strip any [...] suffix so that slice assignments like v[:3] are stored
     // under the base name "v", matching the individual element cards v[0], v[1], ...
     // Globals have an empty curr_suit but are stored under "/" in the deck.
-    
 
     std::string card_value = line.substr(eq_char + 1);
     EmptyCheck(card_value, line_num);
@@ -276,6 +279,15 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
     if (curr_suit.empty()) {
       // no suit, use local name as global name
       global_name = local_name;
+
+      // standalone variable but need to identify suit
+      if (local_name.find('.') != std::string::npos) {
+        auto dot_pos = local_name.find_last_of('.');
+        std::string suit_name = local_name.substr(0, dot_pos);
+        local_name = local_name.substr(dot_pos + 1, std::string::npos);
+        std::replace(suit_name.begin(), suit_name.end(), '.', '/');
+        curr_suit = suit_name;
+      }
     } else {
       std::string suit_card_name = curr_suit;
       std::replace(suit_card_name.begin(), suit_card_name.end(), '/', '.');
@@ -288,8 +300,8 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
     {
       auto lb = local_name.find('[');
       bool is_dotted = (local_name.find('.') != std::string::npos);
-      bool is_slice   = is_dotted && (lb != std::string::npos) &&
-                        (local_name.find(':', lb) != std::string::npos);
+      bool is_slice = is_dotted && (lb != std::string::npos) &&
+                      (local_name.find(':', lb) != std::string::npos);
       std::string slice_base = is_slice ? local_name.substr(0, lb) : "";
       bool is_dotted_update =
           is_dotted &&
@@ -297,20 +309,22 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
            (is_slice && vm.globals.find(slice_base + "[0]") != vm.globals.end()));
       if (is_dotted_update) {
         if (is_slice) {
-          auto expanded_names  = SplitString(local_name, line_num);
+          auto expanded_names = SplitString(local_name, line_num);
           auto expanded_values = SplitString(card_value_stripped, line_num);
           if (expanded_names.size() > expanded_values.size()) {
             std::stringstream msg;
-            msg << "More slice targets than values in dotted assignment at line " << line_num;
+            msg << "More slice targets than values in dotted assignment at line "
+                << line_num;
             fatal(msg);
           }
           for (size_t idx = 0; idx < expanded_names.size(); idx++) {
-            const std::string &ename  = expanded_names[idx];
+            const std::string &ename = expanded_names[idx];
             const std::string &evalue = expanded_values[idx];
             std::string expr = ename + " = " + evalue;
             if (vm.interpret(expr.c_str(), '\n', locals) != pips::InterpretResult::OK) {
               std::stringstream msg;
-              msg << "Failed to compile dotted slice assignment '" << expr << "' at line " << line_num;
+              msg << "Failed to compile dotted slice assignment '" << expr << "' at line "
+                  << line_num;
               fatal(msg);
             }
             locals[ename.c_str()] = vm.globals[ename.c_str()];
@@ -322,7 +336,8 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
         std::string expr = local_name + " = " + card_value;
         if (vm.interpret(expr.c_str(), '\n', locals) != pips::InterpretResult::OK) {
           std::stringstream msg;
-          msg << "Failed to compile dotted assignment '" << expr << "' at line " << line_num;
+          msg << "Failed to compile dotted assignment '" << expr << "' at line "
+              << line_num;
           fatal(msg);
         }
         locals[local_name.c_str()] = vm.globals[local_name.c_str()];
@@ -334,7 +349,8 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
     // Add this card to the card map
     {
       auto bracket = local_name.find('[');
-      std::string base_name = (bracket != std::string::npos) ? local_name.substr(0, bracket) : local_name;
+      std::string base_name =
+          (bracket != std::string::npos) ? local_name.substr(0, bracket) : local_name;
       const std::string &map_suit = curr_suit.empty() ? "/" : curr_suit;
       if (std::find(card_map[map_suit].begin(), card_map[map_suit].end(), base_name) ==
           card_map[map_suit].end()) {
@@ -384,9 +400,12 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
           int paren_depth = 0;
           for (size_t i = 0; i < comma_pos; i++) {
             char c = card_value_stripped[i];
-            if (c == '"') in_quotes = !in_quotes;
-            else if (!in_quotes && c == '(') paren_depth++;
-            else if (!in_quotes && c == ')') paren_depth--;
+            if (c == '"')
+              in_quotes = !in_quotes;
+            else if (!in_quotes && c == '(')
+              paren_depth++;
+            else if (!in_quotes && c == ')')
+              paren_depth--;
           }
           if (!in_quotes && paren_depth == 0) {
             rhs_vec = true;
@@ -411,9 +430,12 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
       bool in_quotes = false;
       bool in_brackets = false;
       for (char c : card_value_stripped) {
-        if (c == '"') in_quotes = !in_quotes;
-        else if (!in_quotes && c == '[') in_brackets = true;
-        else if (!in_quotes && c == ']') in_brackets = false;
+        if (c == '"')
+          in_quotes = !in_quotes;
+        else if (!in_quotes && c == '[')
+          in_brackets = true;
+        else if (!in_quotes && c == ']')
+          in_brackets = false;
         else if (!in_quotes && in_brackets && c == ':') {
           has_colon = true;
           break;
@@ -443,8 +465,8 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
       auto open_bracket = card_value_stripped.find_first_of('[');
       if (open_bracket != std::string::npos) {
         auto close_bracket = card_value_stripped.find_first_of(']', open_bracket);
-        card_value_stripped =
-            card_value_stripped.substr(open_bracket + 1, close_bracket - open_bracket - 1);
+        card_value_stripped = card_value_stripped.substr(
+            open_bracket + 1, close_bracket - open_bracket - 1);
       }
 
       // Split card_value_stripped by commas, but ignore commas inside quotes
@@ -548,7 +570,8 @@ void Deck::BuildInternal(std::istream &ss, const std::string &base_dir) {
           std::replace(suit_name.begin(), suit_name.end(), '/', '.');
           // use suit name as prefix
           vm.globals[suit_name + "." + card.first] = card.second.GetValue();
-          meta[suit_name + "." + card.first] = {card.second.loc, card.second.GetComment()};
+          meta[suit_name + "." + card.first] = {card.second.loc,
+                                                card.second.GetComment()};
         }
       }
     }
@@ -583,7 +606,7 @@ void Deck::RecompileCard(const std::string &line) {
   // The line should already be in the correct format
   // so we can pass it directly to compiler
 
-if (vm.interpret(line.c_str(), '\n') != pips::InterpretResult::OK) {
+  if (vm.interpret(line.c_str(), '\n') != pips::InterpretResult::OK) {
     std::stringstream msg;
     msg << "Failed to compile expression '" << line << "'";
     fatal(msg);
@@ -641,13 +664,13 @@ void Deck::RemoveCard(const std::string &suit, const std::string &name) {
   suit_it->second.erase(card_it);
 }
 
-void Deck::UpdateCard(const std::string &suit, const std::string &name,
-                      const Card &card, std::string comment) {
+void Deck::UpdateCard(const std::string &suit, const std::string &name, const Card &card,
+                      std::string comment) {
   auto &mycard = GetCard(suit, name);
   mycard = card;
   if (!comment.empty() && (comment != "")) {
     mycard.UpdateComment(comment);
-  } 
+  }
 }
 // functions to iterate over the deck
 std::vector<std::string> Deck::GetCardsInOrder(const std::string &suit) const {
@@ -683,7 +706,7 @@ std::vector<Card> Deck::FindSuitFuzzy(std::string suit_) const {
         result.push_back(card.second);
       }
     }
-  } 
+  }
   if (result.empty()) {
     std::cerr << "No suits matching '" << suit_ << "' found in the deck." << std::endl;
   }
@@ -706,7 +729,6 @@ std::vector<Card> Deck::FindSuitInOrder(const std::string &suit, const bool fuzz
         subdeck.push_back(card.second);
       }
     }
-    
   }
   std::sort(subdeck.begin(), subdeck.end(),
             [](const Card &a, const Card &b) { return a.loc < b.loc; });
@@ -729,7 +751,7 @@ bool Deck::DoesCardExist(const std::string &suit, const std::string &name) const
   auto suit_it = deck.find(suit);
   if (suit_it == deck.end()) return false;
   // Be careful of vectors
-  return (suit_it->second.find(name) != suit_it->second.end()) || 
+  return (suit_it->second.find(name) != suit_it->second.end()) ||
          (suit_it->second.find(name + "[0]") != suit_it->second.end());
 }
 bool Deck::IsCardVector(const std::string &suit, const std::string &name) const {
@@ -746,7 +768,7 @@ bool Deck::IsCardVector(const std::string &suit, const std::string &name) const 
 void Deck::WriteDeck(std::ostream &os) const {
   for (const auto &suit_name : suits) {
     if (deck.find(suit_name) == deck.end()) continue;
-    if (!( suit_name.empty() || (suit_name == "/"))) {
+    if (!(suit_name.empty() || (suit_name == "/"))) {
       os << "<" << suit_name << ">\n";
     }
     const auto &suit = deck.at(suit_name);
@@ -758,12 +780,10 @@ void Deck::WriteDeck(std::ostream &os) const {
     for (const auto &card_pair : suit) {
       ordered.push_back({card_pair.first, &card_pair.second});
     }
-    std::sort(ordered.begin(), ordered.end(),
-              [](const auto &a, const auto &b) {
-                if (a.second->loc != b.second->loc)
-                  return a.second->loc < b.second->loc;
-                return a.first < b.first;
-              });
+    std::sort(ordered.begin(), ordered.end(), [](const auto &a, const auto &b) {
+      if (a.second->loc != b.second->loc) return a.second->loc < b.second->loc;
+      return a.first < b.first;
+    });
     for (const auto &entry : ordered) {
       const auto &card = *entry.second;
       const std::string &name = entry.first;
