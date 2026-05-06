@@ -40,7 +40,6 @@ if (NOT RUMMY_STRING_MAX)
     set(RUMMY_STRING_MAX 64)
 endif()
 target_compile_definitions(rummylib PUBLIC STACK_MAX=${RUMMY_STACK_SIZE} STRING_MAX=${RUMMY_STRING_MAX})
-target_link_libraries(rummylib PUBLIC pipslib)
 
 
 if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
