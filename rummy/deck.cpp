@@ -288,6 +288,11 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
         std::replace(suit_name.begin(), suit_name.end(), '.', '/');
         curr_suit = suit_name;
         name_prefix = suit_name + ".";
+        if (deck.find(curr_suit) == deck.end()) {
+          deck[curr_suit] = std::map<std::string, Card>();
+          suits.push_back(curr_suit);
+          card_map[curr_suit] = std::vector<std::string>();
+        }
       }
     } else {
       // standalone variable needs to reset curr_suit
@@ -299,6 +304,11 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
         name_prefix = suit_name + ".";
         std::replace(suit_name.begin(), suit_name.end(), '.', '/');
         curr_suit = suit_name;
+        if (deck.find(curr_suit) == deck.end()) {
+          deck[curr_suit] = std::map<std::string, Card>();
+          suits.push_back(curr_suit);
+          card_map[curr_suit] = std::vector<std::string>();
+        }
       } else {
         std::string suit_card_name = curr_suit;
         std::replace(suit_card_name.begin(), suit_card_name.end(), '/', '.');
