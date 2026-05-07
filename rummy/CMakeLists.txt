@@ -67,11 +67,6 @@ if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
       FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h"
   )
 
-  # Install pips headers alongside rummy so find_package consumers get them too
-  install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../external/pips/pips
-      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-  )
-
   # Export targets
   install(EXPORT RummyTargets
       FILE RummyTargets.cmake
@@ -101,3 +96,9 @@ if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
 else()
   message(STATUS "Rummy built as subproject - no install/export")
 endif()
+
+# install pips headers
+include(GNUInstallDirs)
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../external/pips/pips
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
