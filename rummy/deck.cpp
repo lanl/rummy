@@ -287,15 +287,17 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
         local_name = local_name.substr(dot_pos + 1, std::string::npos);
         std::replace(suit_name.begin(), suit_name.end(), '.', '/');
         curr_suit = suit_name;
+        name_prefix = suit_name + ".";
       }
     } else {
       // standalone variable needs to reset curr_suit
       if (local_name.find('.') != std::string::npos) {
-        global_name = local_name;
         auto dot_pos = local_name.find_last_of('.');
         std::string suit_name = local_name.substr(0, dot_pos);
         local_name = local_name.substr(dot_pos + 1, std::string::npos);
         std::replace(suit_name.begin(), suit_name.end(), '.', '/');
+        name_prefix = suit_name + ".";
+        global_name = name_prefix + local_name;
         curr_suit = suit_name;
       } else {
         std::string suit_card_name = curr_suit;
