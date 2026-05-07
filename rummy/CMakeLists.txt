@@ -40,7 +40,12 @@ if (NOT RUMMY_STRING_MAX)
     set(RUMMY_STRING_MAX 64)
 endif()
 target_compile_definitions(rummylib PUBLIC STACK_MAX=${RUMMY_STACK_SIZE} STRING_MAX=${RUMMY_STRING_MAX})
-target_link_libraries(rummylib PUBLIC pipslib)
+
+# pips is header-only.
+target_include_directories(rummylib PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../external/pips>
+  $<INSTALL_INTERFACE:include>
+)
 
 
 if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
@@ -60,6 +65,11 @@ if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
   # Install headers
   install(DIRECTORY . DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rummy
       FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h"
+  )
+
+  # Install pips headers alongside rummy so find_package consumers get them too
+  install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../external/pips/pips
+      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
   )
 
   # Export targets
