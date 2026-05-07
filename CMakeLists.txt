@@ -57,9 +57,25 @@ if(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
   add_compile_options(-Wno-deprecated-declarations)
 endif()
 
-# Build pips directly from the submodule source.
-add_subdirectory(external/pips pips-build)
-add_subdirectory ("rummy")
+# check for pips
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/pips/pips/vm.hpp")
+  find_package(Git QUIET)
+  if(GIT_FOUND)
+    message(STATUS "Rummy: initializing pips git submodule...")
+    execute_process(
+      COMMAND ${GIT_EXECUTABLE} submodule update --init -- external/pips
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+      RESULT_VARIABLE GIT_SUBMOD_RESULT
+    )
+  endif()
+  if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/pips/pips/vm.hpp")
+    message(FATAL_ERROR
+      "pips submodule headers not found at external/pips. "
+      "Please run: git submodule update --init")
+  endif()
+endif()
+
+add_subdirectory("rummy")
 
 if (RUMMY_ENABLE_UNIT_TESTS)
   rummy_add_unit_tests()
