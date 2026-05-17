@@ -23,6 +23,7 @@
 #include <set>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "deck.hpp"
@@ -30,6 +31,247 @@
 #include <pips/vm.hpp>
 
 namespace Rummy {
+
+namespace {
+
+bool NeedsVmSuitAlias(const std::string &segment) {
+  static const std::set<std::string> reserved = {
+      "and",   "class",   "else",   "false",  "for",    "fn",    "if",
+      "nil",   "not",     "new",    "or",     "print",  "return", "super",
+      "this",  "true",    "var",    "while",  "getattr", "setattr",
+      "pi",    "min",     "max",    "exp",    "sin",    "cos",   "tan",
+      "abs",   "log",     "log10",  "sign",   "sqrt",   "acos",  "asin",
+      "atan",  "atan2",   "ceil",   "floor",  "env",    "str"};
+
+  if (segment.empty() || reserved.count(segment) > 0) {
+    return true;
+  }
+  if (!(std::isalpha(static_cast<unsigned char>(segment.front())) ||
+        segment.front() == '_')) {
+    return true;
+  }
+  return std::any_of(segment.begin(), segment.end(), [](char c) {
+    return !(std::isalnum(static_cast<unsigned char>(c)) || c == '_');
+  });
+}
+
+std::string VmSuitSegmentName(const std::string &segment) {
+  if (!NeedsVmSuitAlias(segment)) {
+    return segment;
+  }
+
+  std::string aliased = "__rummy_suit_";
+  for (char c : segment) {
+    if (std::isalnum(static_cast<unsigned char>(c)) || c == '_') {
+      aliased += c;
+    } else {
+      aliased += '_';
+    }
+  }
+  return aliased;
+}
+
+std::vector<std::string> SplitSuitPath(const std::string &suit_path) {
+  std::vector<std::string> parts;
+  if (suit_path.empty() || suit_path == "/") {
+    return parts;
+  }
+
+  std::stringstream ss(suit_path);
+  std::string part;
+  while (std::getline(ss, part, '/')) {
+    if (!part.empty()) {
+      parts.push_back(part);
+    }
+  }
+  return parts;
+}
+
+std::string SuitObjectPath(const std::string &suit_path) {
+  auto parts = SplitSuitPath(suit_path);
+  std::string object_path;
+  for (size_t idx = 0; idx < parts.size(); ++idx) {
+    if (idx > 0) {
+      object_path += ".";
+    }
+    object_path += VmSuitSegmentName(parts[idx]);
+  }
+  return object_path;
+}
+
+std::string ExternalSuitObjectPath(const std::string &suit_path) {
+  std::string object_path = suit_path;
+  std::replace(object_path.begin(), object_path.end(), '/', '.');
+  return object_path;
+}
+
+std::string SuitClassName(const std::string &suit_path) {
+  std::string class_name = "RummySuit";
+  for (char c : suit_path) {
+    if (std::isalnum(static_cast<unsigned char>(c))) {
+      class_name += c;
+    } else {
+      class_name += '_';
+    }
+  }
+  return class_name;
+}
+
+void EnsureClassField(pips::ClassDef &class_def, const std::string &field_name) {
+  if (std::find(class_def.fields.begin(), class_def.fields.end(), field_name) ==
+      class_def.fields.end()) {
+    class_def.fields.push_back(field_name);
+  }
+}
+
+pips::Instance *CreateInstance(pips::VM &vm, const std::string &class_name) {
+  auto class_it = vm.classes.find(class_name);
+  if (class_it == vm.classes.end()) {
+    class_it = vm.classes.emplace(class_name, pips::ClassDef{}).first;
+    class_it->second.name = class_name;
+  }
+
+  vm.instances.push_back(std::make_unique<pips::Instance>());
+  pips::Instance *instance = vm.instances.back().get();
+  instance->classDef = &class_it->second;
+  for (const auto &field_name : instance->classDef->fields) {
+    instance->fields[field_name] = pips::Value();
+  }
+  return instance;
+}
+
+pips::Instance *EnsureSuitHierarchy(pips::VM &vm, const std::string &suit_path) {
+  auto parts = SplitSuitPath(suit_path);
+  if (parts.empty()) {
+    return nullptr;
+  }
+
+  std::string current_suit;
+  std::string current_object_path;
+  pips::Instance *current_instance = nullptr;
+
+  for (size_t idx = 0; idx < parts.size(); ++idx) {
+    const std::string &part = parts[idx];
+    if (!current_suit.empty()) {
+      current_suit += "/";
+      current_object_path += ".";
+    }
+    current_suit += part;
+    current_object_path += VmSuitSegmentName(part);
+
+    const std::string class_name = SuitClassName(current_suit);
+    auto class_it = vm.classes.find(class_name);
+    if (class_it == vm.classes.end()) {
+      class_it = vm.classes.emplace(class_name, pips::ClassDef{}).first;
+      class_it->second.name = class_name;
+    }
+
+    if (idx == 0) {
+      const std::string global_name = VmSuitSegmentName(part);
+      auto global_it = vm.globals.find(global_name);
+      if (global_it == vm.globals.end() ||
+          global_it->second.type != pips::ValueType::INSTANCE) {
+        pips::Instance *instance = CreateInstance(vm, class_name);
+        vm.globals[global_name] = pips::Value(instance);
+        current_instance = instance;
+      } else {
+        current_instance = global_it->second.as.instance;
+      }
+      continue;
+    }
+
+    const std::string field_name = VmSuitSegmentName(part);
+    EnsureClassField(*current_instance->classDef, field_name);
+    auto field_it = current_instance->fields.find(field_name);
+    if (field_it == current_instance->fields.end() ||
+        field_it->second.type != pips::ValueType::INSTANCE) {
+      pips::Instance *child_instance = CreateInstance(vm, class_name);
+      current_instance->fields[field_name] = pips::Value(child_instance);
+      current_instance = child_instance;
+    } else {
+      current_instance = field_it->second.as.instance;
+    }
+  }
+
+  return current_instance;
+}
+
+bool TryLookupValue(const pips::VM &vm, const std::string &path, pips::Value &value) {
+  auto dot_pos = path.find('.');
+  if (dot_pos == std::string::npos) {
+    auto global_it = vm.globals.find(path);
+    if (global_it == vm.globals.end()) {
+      return false;
+    }
+    value = global_it->second;
+    return true;
+  }
+
+  std::string root_name = path.substr(0, dot_pos);
+  auto global_it = vm.globals.find(VmSuitSegmentName(root_name));
+  if (global_it == vm.globals.end() ||
+      global_it->second.type != pips::ValueType::INSTANCE) {
+    return false;
+  }
+
+  pips::Instance *instance = global_it->second.as.instance;
+  size_t segment_start = dot_pos + 1;
+  while (segment_start < path.size()) {
+    size_t next_dot = path.find('.', segment_start);
+    std::string segment = path.substr(segment_start, next_dot - segment_start);
+
+    const std::string field_name =
+        (next_dot == std::string::npos) ? segment : VmSuitSegmentName(segment);
+    auto field_it = instance->fields.find(field_name);
+    if (field_it == instance->fields.end()) {
+      return false;
+    }
+
+    value = field_it->second;
+    if (next_dot == std::string::npos) {
+      return true;
+    }
+    if (value.type != pips::ValueType::INSTANCE) {
+      return false;
+    }
+
+    instance = value.as.instance;
+    segment_start = next_dot + 1;
+  }
+
+  return false;
+}
+
+void SetSuitFieldValue(pips::VM &vm, const std::string &suit_path,
+                       const std::string &field_name, const pips::Value &value) {
+  pips::Instance *instance = EnsureSuitHierarchy(vm, suit_path);
+  if (instance == nullptr) {
+    return;
+  }
+
+  EnsureClassField(*instance->classDef, field_name);
+  instance->fields[field_name] = value;
+}
+
+std::string CardPath(const std::string &suit, const std::string &card_name) {
+  if (suit.empty() || suit == "/") {
+    return card_name;
+  }
+  return ExternalSuitObjectPath(suit) + "." + card_name;
+}
+
+std::string VmPathForCardPath(const std::string &path) {
+  const auto last_dot = path.find_last_of('.');
+  if (last_dot == std::string::npos) {
+    return path;
+  }
+
+  std::string suit_path = path.substr(0, last_dot);
+  std::replace(suit_path.begin(), suit_path.end(), '.', '/');
+  return SuitObjectPath(suit_path) + "." + path.substr(last_dot + 1);
+}
+
+} // namespace
 
 void Deck::Build(std::string fname, std::string prepends) {
   std::stringstream pss;
@@ -64,6 +306,73 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
                          const std::string &base_dir,
                          std::set<std::string> &include_stack, pips::VTable &locals,
                          std::string &curr_suit, std::string &prev_suit) {
+  auto lookupValueOrFatal = [&](const std::string &path, int line_num) {
+    pips::Value value;
+    if (!TryLookupValue(vm, path, value)) {
+      std::stringstream msg;
+      msg << "Failed to resolve card path '" << path << "' at line " << line_num;
+      fatal(msg);
+    }
+    return value;
+  };
+
+  auto translateSuitPathsForVm = [&](const std::string &expr) {
+    std::string translated;
+    bool in_quotes = false;
+    size_t idx = 0;
+    while (idx < expr.size()) {
+      char c = expr[idx];
+      if (c == '"') {
+        in_quotes = !in_quotes;
+        translated += c;
+        idx++;
+        continue;
+      }
+
+      if (!in_quotes && (std::isalpha(static_cast<unsigned char>(c)) || c == '_')) {
+        size_t end = idx + 1;
+        while (end < expr.size()) {
+          char tc = expr[end];
+          if (std::isalnum(static_cast<unsigned char>(tc)) || tc == '_' || tc == '.' ||
+              tc == '[' || tc == ']' || tc == ':') {
+            end++;
+            continue;
+          }
+          break;
+        }
+
+        std::string token = expr.substr(idx, end - idx);
+        std::string replacement = token;
+        std::string best_suit;
+        size_t dot = token.find('.');
+        while (dot != std::string::npos) {
+          std::string prefix = token.substr(0, dot);
+          std::string suit_candidate = prefix;
+          std::replace(suit_candidate.begin(), suit_candidate.end(), '.', '/');
+          if (deck.find(suit_candidate) != deck.end() && suit_candidate != "/") {
+            best_suit = suit_candidate;
+          }
+          dot = token.find('.', dot + 1);
+        }
+        if (best_suit.empty() && deck.find(token) != deck.end() && token != "/") {
+          best_suit = token;
+        }
+        if (!best_suit.empty()) {
+          const std::string external_prefix = ExternalSuitObjectPath(best_suit);
+          replacement = SuitObjectPath(best_suit) + token.substr(external_prefix.size());
+        }
+
+        translated += replacement;
+        idx = end;
+        continue;
+      }
+
+      translated += c;
+      idx++;
+    }
+    return translated;
+  };
+
   std::string line;
   std::string comment;
   std::string multiline;
@@ -224,6 +533,7 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
         suits.push_back(curr_suit);
         card_map[curr_suit] = std::vector<std::string>();
       }
+      EnsureSuitHierarchy(vm, curr_suit);
       locals.clear();
       continue;
     }
@@ -244,10 +554,46 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
       }
     }
     if (eq_char == std::string::npos) {
+      std::string statement = line.substr(first_char, last_char - first_char + 1);
+      if (statement == "__globals__") {
+        std::printf("Globals:\n");
+        std::set<std::string> printed;
+        for (const auto &[path, card_meta] : meta) {
+          pips::Value value;
+          if (!TryLookupValue(vm, path, value) ||
+              value.type == pips::ValueType::INSTANCE) {
+            continue;
+          }
+          std::printf("  %s = ", path.c_str());
+          pips::printValue(value);
+          std::printf("\n");
+          printed.insert(path);
+        }
+        for (const auto &[name, value] : vm.globals) {
+          if (value.type == pips::ValueType::INSTANCE || printed.count(name) > 0) {
+            continue;
+          }
+          std::printf("  %s = ", name.c_str());
+          pips::printValue(value);
+          std::printf("\n");
+        }
+        for (const auto &[name, value] : locals) {
+          if (value.type == pips::ValueType::INSTANCE || printed.count(name) > 0) {
+            continue;
+          }
+          std::printf("  %s = ", name.c_str());
+          pips::printValue(value);
+          std::printf("\n");
+        }
+        continue;
+      }
       // this is a pips statement
-      if (vm.interpret(line.c_str(), '\n', locals) != pips::InterpretResult::OK) {
+        const std::string translated_statement = translateSuitPathsForVm(statement);
+        if (vm.interpret(translated_statement.c_str(), '\n', locals) !=
+          pips::InterpretResult::OK) {
         std::stringstream msg;
-        msg << "Failed to compile expression '" << line << "' at line " << line_num;
+        msg << "Failed to compile expression '" << statement << "' at line "
+            << line_num;
         msg << "\nPossibly missing '=' in card declaration.";
         fatal(msg);
       }
@@ -276,6 +622,7 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
     EmptyCheck(card_value, line_num);
     std::string global_name;
     std::string name_prefix;
+    std::string object_path;
     if (curr_suit.empty()) {
       // no suit, use local name as global name
       global_name = local_name;
@@ -287,33 +634,36 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
         local_name = local_name.substr(dot_pos + 1, std::string::npos);
         std::replace(suit_name.begin(), suit_name.end(), '.', '/');
         curr_suit = suit_name;
-        name_prefix = suit_name + ".";
+        object_path = SuitObjectPath(curr_suit);
+        name_prefix = ExternalSuitObjectPath(curr_suit) + ".";
         if (deck.find(curr_suit) == deck.end()) {
           deck[curr_suit] = std::map<std::string, Card>();
           suits.push_back(curr_suit);
           card_map[curr_suit] = std::vector<std::string>();
         }
+        EnsureSuitHierarchy(vm, curr_suit);
+        global_name = name_prefix + local_name;
       }
     } else {
       // standalone variable needs to reset curr_suit
       if (local_name.find('.') != std::string::npos) {
-        global_name = local_name;
         auto dot_pos = local_name.find_last_of('.');
         std::string suit_name = local_name.substr(0, dot_pos);
         local_name = local_name.substr(dot_pos + 1, std::string::npos);
-        name_prefix = suit_name + ".";
         std::replace(suit_name.begin(), suit_name.end(), '.', '/');
         curr_suit = suit_name;
+        object_path = SuitObjectPath(curr_suit);
+        name_prefix = ExternalSuitObjectPath(curr_suit) + ".";
+        global_name = name_prefix + local_name;
         if (deck.find(curr_suit) == deck.end()) {
           deck[curr_suit] = std::map<std::string, Card>();
           suits.push_back(curr_suit);
           card_map[curr_suit] = std::vector<std::string>();
         }
+        EnsureSuitHierarchy(vm, curr_suit);
       } else {
-        std::string suit_card_name = curr_suit;
-        std::replace(suit_card_name.begin(), suit_card_name.end(), '/', '.');
-        // use suit name as prefix
-        name_prefix = suit_card_name + ".";
+        object_path = SuitObjectPath(curr_suit);
+        name_prefix = ExternalSuitObjectPath(curr_suit) + ".";
         global_name = name_prefix + local_name;
       }
     }
@@ -327,8 +677,11 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
       std::string slice_base = is_slice ? local_name.substr(0, lb) : "";
       bool is_dotted_update =
           is_dotted &&
-          (vm.globals.find(local_name) != vm.globals.end() ||
-           (is_slice && vm.globals.find(slice_base + "[0]") != vm.globals.end()));
+          ([&]() {
+            pips::Value ignored;
+            return TryLookupValue(vm, local_name, ignored) ||
+                   (is_slice && TryLookupValue(vm, slice_base + "[0]", ignored));
+          })();
       if (is_dotted_update) {
         if (is_slice) {
           auto expanded_names = SplitString(local_name, line_num);
@@ -342,27 +695,29 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
           for (size_t idx = 0; idx < expanded_names.size(); idx++) {
             const std::string &ename = expanded_names[idx];
             const std::string &evalue = expanded_values[idx];
-            std::string expr = ename + " = " + evalue;
+            std::string expr =
+              VmPathForCardPath(ename) + " = " + translateSuitPathsForVm(evalue);
             if (vm.interpret(expr.c_str(), '\n', locals) != pips::InterpretResult::OK) {
               std::stringstream msg;
               msg << "Failed to compile dotted slice assignment '" << expr << "' at line "
                   << line_num;
               fatal(msg);
             }
-            locals[ename.c_str()] = vm.globals[ename.c_str()];
+            locals[ename.c_str()] = lookupValueOrFatal(ename, line_num);
             meta[ename.c_str()] = {line_num, comment};
           }
           comment.clear();
           continue;
         }
-        std::string expr = local_name + " = " + card_value;
+        std::string expr =
+          VmPathForCardPath(local_name) + " = " + translateSuitPathsForVm(card_value);
         if (vm.interpret(expr.c_str(), '\n', locals) != pips::InterpretResult::OK) {
           std::stringstream msg;
           msg << "Failed to compile dotted assignment '" << expr << "' at line "
               << line_num;
           fatal(msg);
         }
-        locals[local_name.c_str()] = vm.globals[local_name.c_str()];
+        locals[local_name.c_str()] = lookupValueOrFatal(local_name, line_num);
         meta[local_name.c_str()] = {line_num, comment};
         comment.clear();
         continue;
@@ -469,14 +824,20 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
       // a = 2
       // a[0] = 2
       // a = b[0]
-      std::string expr = "var " + global_name + " = " + card_value;
+      std::string expr;
+      if (curr_suit.empty()) {
+        expr = "var " + global_name + " = " + translateSuitPathsForVm(card_value);
+      } else {
+        expr = "setattr(" + object_path + ", \"" + local_name + "\", " +
+               translateSuitPathsForVm(card_value) + ")";
+      }
       // add the local card to the locals table
       if (vm.interpret(expr.c_str(), '\n', locals) != pips::InterpretResult::OK) {
         std::stringstream msg;
         msg << "Failed to compile expression '" << expr << "' at line " << line_num;
         fatal(msg);
       }
-      auto value = vm.globals[global_name.c_str()];
+      auto value = lookupValueOrFatal(global_name, line_num);
       meta[global_name.c_str()] = {line_num, comment};
       comment.clear();
       // Stash the local for this suit
@@ -516,13 +877,20 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
         EmptyCheck(value, line_num);
         // add the local card to the locals table
         std::string vec_name = global_name + "[" + std::to_string(index) + "]";
-        std::string expr = "var " + vec_name + " = " + value;
+        std::string expr;
+        if (curr_suit.empty()) {
+          expr = "var " + vec_name + " = " + translateSuitPathsForVm(value);
+        } else {
+          std::string field_name = local_name + "[" + std::to_string(index) + "]";
+          expr = "setattr(" + object_path + ", \"" + field_name + "\", " +
+                 translateSuitPathsForVm(value) + ")";
+        }
         if (vm.interpret(expr.c_str(), '\n', locals) != pips::InterpretResult::OK) {
           std::stringstream msg;
           msg << "Failed to compile expression '" << expr << "' at line " << line_num;
           fatal(msg);
         }
-        auto vec_value = vm.globals[vec_name.c_str()];
+        auto vec_value = lookupValueOrFatal(vec_name, line_num);
         meta[vec_name.c_str()] = {line_num, comment};
         comment.clear();
         // Stash the local for this suit
@@ -549,13 +917,20 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
         std::string local_vec_name = card_names[idx];
         std::string global_vec_name = name_prefix + local_vec_name;
 
-        std::string expr = "var " + global_vec_name + " = " + card_values[idx];
+        std::string expr;
+        if (curr_suit.empty()) {
+          expr = "var " + global_vec_name + " = " +
+                 translateSuitPathsForVm(card_values[idx]);
+        } else {
+          expr = "setattr(" + object_path + ", \"" + local_vec_name + "\", " +
+                 translateSuitPathsForVm(card_values[idx]) + ")";
+        }
         if (vm.interpret(expr.c_str(), '\n', locals) != pips::InterpretResult::OK) {
           std::stringstream msg;
           msg << "Failed to compile expression '" << expr << "' at line " << line_num;
           fatal(msg);
         }
-        auto value = vm.globals[global_vec_name.c_str()];
+        auto value = lookupValueOrFatal(global_vec_name, line_num);
         meta[global_vec_name.c_str()] = {line_num, comment};
         comment.clear();
         // Stash the local for this suit
@@ -583,17 +958,12 @@ void Deck::BuildInternal(std::istream &ss, const std::string &base_dir) {
   if (!deck.empty()) {
     for (const auto &suit : deck) {
       for (const auto &card : suit.second) {
-        // replace suit name / with _
-        std::string suit_name = suit.first;
-        if (suit_name == "/") {
+        if (suit.first == "/") {
           vm.globals[card.first] = card.second.GetValue();
           meta[card.first] = {card.second.loc, card.second.GetComment()};
         } else {
-          std::replace(suit_name.begin(), suit_name.end(), '/', '.');
-          // use suit name as prefix
-          vm.globals[suit_name + "." + card.first] = card.second.GetValue();
-          meta[suit_name + "." + card.first] = {card.second.loc,
-                                                card.second.GetComment()};
+          SetSuitFieldValue(vm, suit.first, card.first, card.second.GetValue());
+          meta[CardPath(suit.first, card.first)] = {card.second.loc, card.second.GetComment()};
         }
       }
     }
@@ -606,21 +976,22 @@ void Deck::BuildInternal(std::istream &ss, const std::string &base_dir) {
   }
   CompileInput(ss, meta, base_dir);
 
-  for (auto global : vm.globals) {
-    const int loc = meta[global.first].loc;
-    const auto comment = meta[global.first].comment;
-    // find position of the last dot
-    const auto last_dot = global.first.find_last_of('.');
+  for (const auto &[path, card_meta] : meta) {
+    pips::Value value;
+    if (!TryLookupValue(vm, path, value)) {
+      continue;
+    }
+    const auto last_dot = path.find_last_of('.');
     std::string suit, card_name;
     if (last_dot == std::string::npos) {
       suit = "/";
-      card_name = global.first;
+      card_name = path;
     } else {
-      suit = global.first.substr(0, last_dot);
-      card_name = global.first.substr(last_dot + 1);
+      suit = path.substr(0, last_dot);
+      card_name = path.substr(last_dot + 1);
       std::replace(suit.begin(), suit.end(), '.', '/');
     }
-    CopyCard(Card(suit, card_name, global.second, comment, loc));
+    CopyCard(Card(suit, card_name, value, card_meta.comment, card_meta.loc));
   }
 }
 
@@ -637,22 +1008,65 @@ void Deck::RecompileCard(const std::string &line) {
 }
 void Deck::UpdateDeck(void) {
   // Update the table
-  for (auto global : vm.globals) {
-    const auto last_dot = global.first.find_last_of('.');
-    std::string suit, card_name;
-    if (last_dot == std::string::npos) {
-      suit = "/";
-      card_name = global.first;
-    } else {
-      suit = global.first.substr(0, last_dot);
-      card_name = global.first.substr(last_dot + 1);
-      std::replace(suit.begin(), suit.end(), '.', '/');
-    }
-    if (DoesSuitExist(suit) && DoesCardExist(suit, card_name)) {
-      UpdateCard(suit, card_name, global.second);
+  for (const auto &[suit_name, cards] : deck) {
+    for (const auto &[card_name, card] : cards) {
+      pips::Value value;
+      if (!TryLookupValue(vm, CardPath(suit_name, card_name), value)) {
+        continue;
+      }
+      if (DoesSuitExist(suit_name) && DoesCardExist(suit_name, card_name)) {
+        UpdateCard(suit_name, card_name,
+                   Card(suit_name, card_name, value, card.GetComment(), card.loc));
+      }
     }
   }
   return;
+}
+
+void Deck::CopyVmState(const pips::VM &other_vm) {
+  vm = pips::VM();
+  vm.functions = other_vm.functions;
+  vm.classes = other_vm.classes;
+
+  std::unordered_map<const pips::Instance *, pips::Instance *> instance_map;
+  vm.instances.reserve(other_vm.instances.size());
+  for (const auto &source_instance : other_vm.instances) {
+    auto copied_instance = std::make_unique<pips::Instance>();
+    if (source_instance && source_instance->classDef) {
+      auto class_it = vm.classes.find(source_instance->classDef->name);
+      if (class_it != vm.classes.end()) {
+        copied_instance->classDef = &class_it->second;
+      }
+    }
+    instance_map[source_instance.get()] = copied_instance.get();
+    vm.instances.push_back(std::move(copied_instance));
+  }
+
+  auto copyValue = [&](const pips::Value &source_value) {
+    pips::Value copied_value(source_value);
+    if (source_value.type == pips::ValueType::INSTANCE) {
+      auto instance_it = instance_map.find(source_value.as.instance);
+      if (instance_it != instance_map.end()) {
+        copied_value.as.instance = instance_it->second;
+      }
+    }
+    return copied_value;
+  };
+
+  for (size_t idx = 0; idx < other_vm.instances.size(); ++idx) {
+    const auto &source_instance = other_vm.instances[idx];
+    auto &copied_instance = vm.instances[idx];
+    if (!source_instance || !copied_instance) {
+      continue;
+    }
+    for (const auto &[field_name, field_value] : source_instance->fields) {
+      copied_instance->fields[field_name] = copyValue(field_value);
+    }
+  }
+
+  for (const auto &[name, value] : other_vm.globals) {
+    vm.globals[name] = copyValue(value);
+  }
 }
 
 Card &Deck::GetCard(const std::string &suit, const std::string &name) {

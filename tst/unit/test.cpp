@@ -897,11 +897,11 @@ TEST_CASE("pips - print() function") {
          << "<out>\n"
          << "flt = 3.5\n"
          << "boo = true\n"
-         << "str = \"hello\"\n"
+         << "string = \"hello\"\n"
          << "print(\"num =\", num)\n"
          << "print(\"flt =\", out.flt)\n"
          << "print(\"boo =\", out.boo)\n"
-         << "print(\"str =\", out.str)\n";
+         << "print(\"string =\", out.string)\n";
       deck.Build(ss);
     });
 
@@ -909,7 +909,7 @@ TEST_CASE("pips - print() function") {
       REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("num = 42"));
       REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("flt = 3.5"));
       REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("boo = true"));
-      REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("str = hello"));
+      REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("string = hello"));
     }
   }
 

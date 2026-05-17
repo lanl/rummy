@@ -140,16 +140,22 @@ struct CardMeta {
 class Deck {
  public:
   Deck() = default;
-  Deck(const Deck &other) : deck(other.deck), suits(other.suits), card_map(other.card_map), vm(other.vm) {}
+  Deck(const Deck &other)
+      : deck(other.deck), suits(other.suits), card_map(other.card_map) {
+    CopyVmState(other.vm);
+  }
   Deck &operator=(const Deck &other) {
     if (this != &other) {
       deck = other.deck;
       suits = other.suits;
       card_map = other.card_map;
-      vm = other.vm;
+      vm = pips::VM();
+      CopyVmState(other.vm);
     }
     return *this;
   }
+  Deck(Deck &&) noexcept = default;
+  Deck &operator=(Deck &&) noexcept = default;
   void Build(std::string fname, std::string prepends = "");
   void Build(std::istream &ss);
   void Build(std::istream &ss, std::string prepends);
@@ -317,6 +323,7 @@ class Deck {
   }
 
  private:
+  void CopyVmState(const pips::VM &other_vm);
   void BuildInternal(std::istream &ss, const std::string &base_dir);
   void CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta,
                      const std::string &base_dir, std::set<std::string> &include_stack,
