@@ -1,0 +1,5 @@
+# Exercise native pips vector features end-to-end through Deck2.
+<vecops>
+small = [1, 2, 3]
+mixed = [10, 20, 30, 40, 50]
+sliced[:3] = [7, 8, 9]

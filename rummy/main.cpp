@@ -18,9 +18,10 @@
 #include <memory>
 #include <string>
 
-#include "deck.hpp"
+#include "simple_deck.hpp"
+#include "full_deck.hpp"
 
-void Deal(Rummy::Deck *deck) {
+void Deal(Rummy::FullDeck *deck) {
   std::cout << "Dealing the cards..." << std::endl;
   for (const auto &suit : deck->GetDeck()) {
     std::cout << suit.first << std::endl;
@@ -43,10 +44,10 @@ int main(int argc, char *argv[]) {
     printf("Booting up REPL\n");
     vm.repl('\n');
   } else if (argc == 2) {
-    // auto deck = std::make_unique<Rummy::Deck>();
-    Rummy::Deck deck;
+    // auto deck = std::make_unique<Rummy::SimpleDeck>();
+    Rummy::FullDeck deck(Rummy::FullDeck::Mode::Strict);
     // deck->Build(argv[1]);
-    deck.Build(argv[1], DefinePC());
+    deck.Build(argv[1]); //, DefinePC());
 
     Deal(&deck);
   }

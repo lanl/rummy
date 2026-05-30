@@ -1,0 +1,9 @@
+# __globals__.par
+# Exercises the __globals__ printer (no assertions, just must not crash)
+g1 = 100
+g2 = "world"
+
+<gsuit>
+f1 = g1 + 1
+
+__globals__

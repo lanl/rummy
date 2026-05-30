@@ -1,0 +1,10 @@
+# nested_declarative.par
+# Nested suit hierarchy: parent suit and a child suit.
+# Child references parent's fields via external dotted path.
+<parent>
+x = 1
+y = 2
+
+<parent/child>
+z = 3
+w = parent.x + parent.y

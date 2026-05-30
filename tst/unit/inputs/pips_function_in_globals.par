@@ -1,0 +1,10 @@
+# pips_function_in_globals.par
+# Defines a pips function in globals and uses it inside a suit block.
+# Multi-line fn declaration is brace-accumulated into one emit unit.
+fn double(x) {
+  return x * 2
+}
+
+<funcsuit>
+base = 5
+doubled = double(5)

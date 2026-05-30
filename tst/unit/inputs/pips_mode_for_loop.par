@@ -1,0 +1,9 @@
+# pips_mode_for_loop.par
+# A pips-mode block: a for loop dynamically populates vector fields.
+# The readback walk must discover v[0], v[1], v[2] even though they
+# are not declared by static card lines.
+<loopblock(b)>
+for (var i = 0; i < 3; i = i + 1) {
+  setattr(b, "v[" + str(i) + "]", i * 10)
+}
+setattr(b, "static_field", 42)

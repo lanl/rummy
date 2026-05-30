@@ -1,0 +1,17 @@
+# Two user-declared classes; each used to create one suit. Exercises
+# FullDeck::FindSuitsOfClass and GetClassName.
+class Point {
+  var x
+  var y
+}
+
+class Other {
+  var k
+}
+
+<Point(p)>
+p.x = 3
+p.y = 4
+
+<Other(o)>
+o.k = 99

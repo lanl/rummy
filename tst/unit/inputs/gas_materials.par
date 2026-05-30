@@ -1,0 +1,36 @@
+# Multiple instances of the same user-declared class.
+# Three <Gas(matN)> headers should produce three distinct suits
+# (mat1, mat2, mat3), all carrying class metadata "Gas". This is
+# the canonical "loop over all Gas instances" pattern.
+class Gas {
+  var rho
+  var T
+  var eos
+}
+
+class Eos {
+  var type = "ideal"
+  var gamma = 5.0/3.0
+  var filename
+}
+
+<Gas(mat1)>
+rho = 1.0 # density
+T   = 300.0, 100.0, &
+    200.0 # temperature; test multi-value parsing
+
+<./eos>
+type = "ideal"
+gamma = 5.0/3.0
+
+<Gas(mat2)>
+rho = 2.0
+T   = 350.0
+<./eos>
+type = "table"
+
+<Gas(mat3)>
+rho = 3.0
+T   = 400.0
+<./eos>
+

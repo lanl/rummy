@@ -1,0 +1,8 @@
+# include_root.par
+# Root file that includes a child file
+global_val = 7
+
+<root_suit>
+root_field = global_val * 2
+
+include "include_child.par"

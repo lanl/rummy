@@ -1,0 +1,8 @@
+# declarative_block.par
+# Simple declarative block with scalar fields (no self-reference)
+<myblock>
+alpha = 1
+beta = 2.5
+gamma = "hello"
+flag = true
+derived = 99

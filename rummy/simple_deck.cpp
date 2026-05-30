@@ -26,7 +26,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "deck.hpp"
+#include "simple_deck.hpp"
 #include "rummy_utils.hpp"
 #include <pips/vm.hpp>
 
@@ -273,7 +273,7 @@ std::string VmPathForCardPath(const std::string &path) {
 
 } // namespace
 
-void Deck::Build(std::string fname, std::string prepends) {
+void SimpleDeck::Build(std::string fname, std::string prepends) {
   std::stringstream pss;
   pss << prepends;
   Build(pss);
@@ -290,19 +290,19 @@ void Deck::Build(std::string fname, std::string prepends) {
   }
 }
 
-void Deck::Build(std::istream &ss, std::string prepends) {
+void SimpleDeck::Build(std::istream &ss, std::string prepends) {
   std::stringstream pss;
   pss << prepends;
   Build(pss);
   Build(ss);
 }
 
-void Deck::Build(std::istream &ss, std::istream &prepends) {
+void SimpleDeck::Build(std::istream &ss, std::istream &prepends) {
   Build(prepends);
   Build(ss);
 }
 
-void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta,
+void SimpleDeck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta,
                          const std::string &base_dir,
                          std::set<std::string> &include_stack, pips::VTable &locals,
                          std::string &curr_suit, std::string &prev_suit) {
@@ -359,7 +359,25 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
         }
         if (!best_suit.empty()) {
           const std::string external_prefix = ExternalSuitObjectPath(best_suit);
-          replacement = SuitObjectPath(best_suit) + token.substr(external_prefix.size());
+          std::string remainder = token.substr(external_prefix.size());
+          // Strip the joining dot between suit path and field (if any).
+          std::string tail = remainder;
+          if (!tail.empty() && tail.front() == '.') tail.erase(0, 1);
+          // Legacy decks store vector elements as literal field names like
+          // "coords[0]" rather than as a single vector field. The new pips
+          // compiler does strict class-field validation, so a direct access
+          // like `mesh.coords[0]` fails — `coords` is not a class field.
+          // Route bracket-name accesses through getattr() so the literal
+          // field name "coords[0]" is looked up at runtime. Only apply when
+          // the field tail has a single segment that itself contains a [.
+          auto first_bracket = tail.find('[');
+          if (first_bracket != std::string::npos &&
+              tail.find('.') == std::string::npos) {
+            replacement = "getattr(" + SuitObjectPath(best_suit) + ", \"" +
+                          tail + "\")";
+          } else {
+            replacement = SuitObjectPath(best_suit) + remainder;
+          }
         }
 
         translated += replacement;
@@ -514,15 +532,52 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
         std::stringstream msg;
         msg << "Empty suit name at line " << line_num;
         fatal(msg);
-      } else if (suit_name.compare(0, 2, "..") == 0) {
-        // replace .. with current suit name
-        // don't update previous suit
+      } else if (!suit_name.empty() && suit_name[0] == '.') {
+        // Relative suit syntax — never updates prev_suit so sibling blocks
+        // all anchor to the same base:
+        //   <./sub>        child of current anchor  (prev_suit/sub)
+        //   <../sub>       sibling one level up     (parent of prev_suit)/sub
+        //   <../../sub>    sibling two levels up, etc.
         if (prev_suit.empty()) {
           std::stringstream msg;
-          msg << "Cannot use '..' in suit name at line " << line_num;
+          msg << "Relative suit header with no prior suit at line " << line_num;
           fatal(msg);
         }
-        suit_name = prev_suit + suit_name.substr(2);
+        if (suit_name.size() >= 2 && suit_name[1] == '/') {
+          // "./" → child of current anchor
+          suit_name = prev_suit + suit_name.substr(1);
+        } else {
+          int levels = 0;
+          size_t pos = 0;
+          while (pos + 2 < suit_name.size() &&
+                 suit_name[pos] == '.' && suit_name[pos + 1] == '.' &&
+                 suit_name[pos + 2] == '/') {
+            ++levels;
+            pos += 3;
+          }
+          if (levels == 0) {
+            std::stringstream msg;
+            msg << "Malformed relative suit header '" << suit_name
+                << "' at line " << line_num;
+            fatal(msg);
+          }
+          std::string base = prev_suit;
+          for (int i = 0; i < levels; ++i) {
+            auto slash = base.rfind('/');
+            if (slash == std::string::npos) {
+              if (base.empty()) {
+                std::stringstream msg;
+                msg << "Relative suit header goes above root at line " << line_num;
+                fatal(msg);
+              }
+              base.clear();
+              break;
+            }
+            base = base.substr(0, slash);
+          }
+          std::string rest = suit_name.substr(pos);
+          suit_name = base.empty() ? rest : (base + "/" + rest);
+        }
         curr_suit = suit_name;
       } else {
         curr_suit = suit_name;
@@ -871,6 +926,41 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
       if (!current.empty()) {
         values.push_back(current);
       }
+      // For globals, the new pips compiler rejects `var name[X] = v` as an
+      // invalid assignment target. Emit a single native-vector declaration
+      // up-front; per-element cards are then materialised from the vector.
+      if (curr_suit.empty()) {
+        std::string vec_expr = "var " + global_name + " = [";
+        for (size_t i = 0; i < values.size(); ++i) {
+          if (i > 0) vec_expr += ", ";
+          std::string v = values[i];
+          RemoveWhitespacePreserveQuotes(v, line_num);
+          EmptyCheck(v, line_num);
+          vec_expr += translateSuitPathsForVm(v);
+        }
+        vec_expr += "]";
+        if (vm.interpret(vec_expr.c_str(), '\n', locals) !=
+            pips::InterpretResult::OK) {
+          std::stringstream msg;
+          msg << "Failed to compile expression '" << vec_expr << "' at line "
+              << line_num;
+          fatal(msg);
+        }
+        auto vec_value = lookupValueOrFatal(global_name, line_num);
+        if (vec_value.type == pips::ValueType::VECTOR && vec_value.as.vector) {
+          for (size_t i = 0; i < vec_value.as.vector->elements.size(); ++i) {
+            std::string vec_name = global_name + "[" + std::to_string(i) + "]";
+            meta[vec_name.c_str()] = {line_num, comment};
+            const pips::Value &elem = vec_value.as.vector->elements[i];
+            locals[vec_name.c_str()] = elem;
+            // Legacy lookups (TryLookupValue, GetVector) expect a per-element
+            // global keyed "name[0]", "name[1]", ... Mirror them here.
+            vm.globals[vec_name] = elem;
+          }
+        }
+        comment.clear();
+        continue;
+      }
       int index = 0;
       for (auto &value : values) {
         RemoveWhitespacePreserveQuotes(value, line_num);
@@ -878,13 +968,9 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
         // add the local card to the locals table
         std::string vec_name = global_name + "[" + std::to_string(index) + "]";
         std::string expr;
-        if (curr_suit.empty()) {
-          expr = "var " + vec_name + " = " + translateSuitPathsForVm(value);
-        } else {
-          std::string field_name = local_name + "[" + std::to_string(index) + "]";
-          expr = "setattr(" + object_path + ", \"" + field_name + "\", " +
-                 translateSuitPathsForVm(value) + ")";
-        }
+        std::string field_name = local_name + "[" + std::to_string(index) + "]";
+        expr = "setattr(" + object_path + ", \"" + field_name + "\", " +
+               translateSuitPathsForVm(value) + ")";
         if (vm.interpret(expr.c_str(), '\n', locals) != pips::InterpretResult::OK) {
           std::stringstream msg;
           msg << "Failed to compile expression '" << expr << "' at line " << line_num;
@@ -941,7 +1027,7 @@ void Deck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta
   } // end while
 }
 
-void Deck::CompileInput(std::istream &ss, std::map<std::string, CardMeta> &meta,
+void SimpleDeck::CompileInput(std::istream &ss, std::map<std::string, CardMeta> &meta,
                         const std::string &base_dir) {
   pips::VTable locals;
   std::string curr_suit;
@@ -950,9 +1036,9 @@ void Deck::CompileInput(std::istream &ss, std::map<std::string, CardMeta> &meta,
   CompileStream(ss, meta, base_dir, include_stack, locals, curr_suit, prev_suit);
 }
 
-void Deck::Build(std::istream &ss) { BuildInternal(ss, ""); }
+void SimpleDeck::Build(std::istream &ss) { BuildInternal(ss, ""); }
 
-void Deck::BuildInternal(std::istream &ss, const std::string &base_dir) {
+void SimpleDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
   std::map<std::string, CardMeta> meta;
 
   if (!deck.empty()) {
@@ -995,7 +1081,7 @@ void Deck::BuildInternal(std::istream &ss, const std::string &base_dir) {
   }
 }
 
-void Deck::RecompileCard(const std::string &line) {
+void SimpleDeck::RecompileCard(const std::string &line) {
   // The line should already be in the correct format
   // so we can pass it directly to compiler
 
@@ -1006,7 +1092,7 @@ void Deck::RecompileCard(const std::string &line) {
   }
   return;
 }
-void Deck::UpdateDeck(void) {
+void SimpleDeck::UpdateDeck(void) {
   // Update the table
   for (const auto &[suit_name, cards] : deck) {
     for (const auto &[card_name, card] : cards) {
@@ -1023,132 +1109,7 @@ void Deck::UpdateDeck(void) {
   return;
 }
 
-void Deck::CopyVmState(const pips::VM &other_vm) {
-  vm = pips::VM();
-  vm.functions = other_vm.functions;
-  vm.classes = other_vm.classes;
-
-  std::unordered_map<const pips::Instance *, pips::Instance *> instance_map;
-  vm.instances.reserve(other_vm.instances.size());
-  for (const auto &source_instance : other_vm.instances) {
-    auto copied_instance = std::make_unique<pips::Instance>();
-    if (source_instance && source_instance->classDef) {
-      auto class_it = vm.classes.find(source_instance->classDef->name);
-      if (class_it != vm.classes.end()) {
-        copied_instance->classDef = &class_it->second;
-      }
-    }
-    instance_map[source_instance.get()] = copied_instance.get();
-    vm.instances.push_back(std::move(copied_instance));
-  }
-
-  auto copyValue = [&](const pips::Value &source_value) {
-    pips::Value copied_value(source_value);
-    if (source_value.type == pips::ValueType::INSTANCE) {
-      auto instance_it = instance_map.find(source_value.as.instance);
-      if (instance_it != instance_map.end()) {
-        copied_value.as.instance = instance_it->second;
-      }
-    }
-    return copied_value;
-  };
-
-  for (size_t idx = 0; idx < other_vm.instances.size(); ++idx) {
-    const auto &source_instance = other_vm.instances[idx];
-    auto &copied_instance = vm.instances[idx];
-    if (!source_instance || !copied_instance) {
-      continue;
-    }
-    for (const auto &[field_name, field_value] : source_instance->fields) {
-      copied_instance->fields[field_name] = copyValue(field_value);
-    }
-  }
-
-  for (const auto &[name, value] : other_vm.globals) {
-    vm.globals[name] = copyValue(value);
-  }
-}
-
-Card &Deck::GetCard(const std::string &suit, const std::string &name) {
-  auto suit_it = deck.find(suit);
-  if (suit_it == deck.end()) {
-    std::stringstream msg;
-    msg << "Suit '" << suit << "' not found in the deck.";
-    fatal(msg);
-  }
-  auto card_it = suit_it->second.find(name);
-  if (card_it == suit_it->second.end()) {
-    std::stringstream msg;
-    msg << "Card '" << name << "' not found in suit '" << suit << "'.";
-    fatal(msg);
-  }
-  return card_it->second;
-}
-void Deck::RemoveCard(const std::string &suit, const std::string &name) {
-  auto suit_it = deck.find(suit);
-  if (suit_it == deck.end()) {
-    std::stringstream msg;
-    msg << "Suit '" << suit << "' not found in the deck.";
-    fatal(msg);
-  }
-  auto card_it = suit_it->second.find(name);
-  if (card_it == suit_it->second.end()) {
-    std::stringstream msg;
-    msg << "Card '" << name << "' not found in suit '" << suit << "'.";
-    fatal(msg);
-  }
-  suit_it->second.erase(card_it);
-}
-
-void Deck::UpdateCard(const std::string &suit, const std::string &name, const Card &card,
-                      std::string comment) {
-  auto &mycard = GetCard(suit, name);
-  mycard = card;
-  if (!comment.empty() && (comment != "")) {
-    mycard.UpdateComment(comment);
-  }
-}
-// functions to iterate over the deck
-std::vector<std::string> Deck::GetCardsInOrder(const std::string &suit) const {
-  if (card_map.find(suit) != card_map.end()) {
-    return card_map.at(suit);
-  }
-  return {};
-}
-// FindSuit returns a map of cards that match the suit
-std::map<std::string, Card> Deck::FindSuit(const std::string &suit) const {
-  auto it = deck.find(suit);
-  if (it == deck.end()) {
-    std::stringstream msg;
-    msg << "Suit '" << suit << "' not found in the deck.";
-    fatal(msg);
-  }
-  return it->second;
-}
-// fuzzy match version of FindSuit
-std::vector<Card> Deck::FindSuitFuzzy(std::string suit_) const {
-  if (suit_ != "/") {
-    // remove wildcard character '*' if present
-    auto star_pos = suit_.find('*');
-    if (star_pos != std::string::npos) {
-      suit_.erase(star_pos, 1);
-    }
-  }
-  std::vector<Card> result;
-  for (const auto &suit : deck) {
-    if (suit.first.find(suit_) != std::string::npos) {
-      // use the loc as the sorting index
-      for (const auto &card : suit.second) {
-        result.push_back(card.second);
-      }
-    }
-  }
-  if (result.empty()) {
-    std::cerr << "No suits matching '" << suit_ << "' found in the deck." << std::endl;
-  }
-  return result;
-}
-std::vector<Card> Deck::FindSuitInOrder(const std::string &suit, const bool fuzzy) const {
+std::vector<Card> SimpleDeck::FindSuitInOrder(const std::string &suit, const bool fuzzy) const {
   std::vector<Card> subdeck;
   if (fuzzy) {
     subdeck = FindSuitFuzzy(suit);
@@ -1170,38 +1131,7 @@ std::vector<Card> Deck::FindSuitInOrder(const std::string &suit, const bool fuzz
             [](const Card &a, const Card &b) { return a.loc < b.loc; });
   return subdeck;
 }
-std::vector<Card> Deck::FindCardFuzzy(std::string suit, std::string name) const {
-  std::vector<Card> result;
-  auto cards = FindSuit(suit);
-  for (const auto &card : cards) {
-    if (card.first.find(name) != std::string::npos) {
-      result.push_back(card.second);
-    }
-  }
-  return result;
-}
-bool Deck::DoesSuitExist(const std::string &suit) const {
-  return deck.find(suit) != deck.end();
-}
-bool Deck::DoesCardExist(const std::string &suit, const std::string &name) const {
-  auto suit_it = deck.find(suit);
-  if (suit_it == deck.end()) return false;
-  // Be careful of vectors
-  return (suit_it->second.find(name) != suit_it->second.end()) ||
-         (suit_it->second.find(name + "[0]") != suit_it->second.end());
-}
-bool Deck::IsCardVector(const std::string &suit, const std::string &name) const {
-  auto suit_it = deck.find(suit);
-  if (suit_it == deck.end()) return false;
-  // one of the cards must be the first element
-  for (const auto &card : suit_it->second) {
-    if (card.first == name + "[0]") {
-      return true;
-    }
-  }
-  return false;
-}
-void Deck::WriteDeck(std::ostream &os) const {
+void SimpleDeck::WriteDeck(std::ostream &os) const {
   for (const auto &suit_name : suits) {
     if (deck.find(suit_name) == deck.end()) continue;
     if (!(suit_name.empty() || (suit_name == "/"))) {

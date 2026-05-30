@@ -17,7 +17,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
-#include "deck.hpp"
+#include "simple_deck.hpp"
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -28,7 +28,7 @@
 
 TEST_CASE("Deck") {
   GIVEN("A simple deck") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "global1 = 42\n"
        << "<suit1>\n"
@@ -104,7 +104,7 @@ TEST_CASE("Deck") {
 
 TEST_CASE("Deck - String Values") {
   GIVEN("A deck with string values") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "global_str = \"hello\"\n"
        << "<suit1>\n"
@@ -136,7 +136,7 @@ TEST_CASE("Deck - String Values") {
 
 TEST_CASE("Deck - Boolean Values") {
   GIVEN("A deck with boolean values") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "global_bool = true\n"
        << "<suit1>\n"
@@ -168,7 +168,7 @@ TEST_CASE("Deck - Boolean Values") {
 
 TEST_CASE("Deck - Complex Expressions") {
   GIVEN("A deck with complex expressions") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "global1 = 10\n"
        << "global2 = 20\n"
@@ -197,7 +197,7 @@ TEST_CASE("Deck - Complex Expressions") {
 
 TEST_CASE("Deck - Vector Operations") {
   GIVEN("A deck with vector operations") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "global_vec = [1, 2, 3]\n"
        << "<suit1>\n"
@@ -249,7 +249,7 @@ TEST_CASE("Deck - Vector Operations") {
 
 TEST_CASE("Deck - Build with String Parameter") {
   GIVEN("A deck built with string parameter") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::string content = "global1 = 42\n<suit1>\ncard1 = global1\n";
     std::stringstream ss(content);
 
@@ -266,7 +266,7 @@ TEST_CASE("Deck - Build with String Parameter") {
 
 TEST_CASE("Deck - Build with Additional Configuration") {
   GIVEN("A deck with additional configuration") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::string content = "global1 = c * 2\n<suit1>\ncard1 = global1\n";
     std::string config = "c = 3e8\n";
     std::stringstream ss(content);
@@ -357,7 +357,7 @@ TEST_CASE("Card - Different Value Types") {
 
 TEST_CASE("Deck - Edge Cases") {
   GIVEN("A deck for edge case testing") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
 
     WHEN("We build an empty deck") {
       std::stringstream empty_ss;
@@ -405,7 +405,7 @@ TEST_CASE("Card - Comment Operations") {
   }
 
   GIVEN("Multiple cards with different comments") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     deck.AddCard("test", "card1", 10, "Comment 1");
     deck.AddCard("test", "card2", 20, "Comment 2");
     deck.AddCard("test", "card3", 30, "Comment 3");
@@ -432,7 +432,7 @@ TEST_CASE("Card - Comment Operations") {
 }
 TEST_CASE("Deck - Hash inside quoted string value") {
   GIVEN("A deck where a string value contains '#'") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "<suit1>\n"
        << "url = \"http://example.com\"  # real comment\n"
@@ -451,7 +451,7 @@ TEST_CASE("Deck - Hash inside quoted string value") {
 
 TEST_CASE("Deck - Deck copy constructor and assignment") {
   GIVEN("A built deck") {
-    Rummy::Deck original;
+    Rummy::SimpleDeck original;
     std::stringstream ss;
     ss << "g = 9\n"
        << "<physics>\n"
@@ -461,7 +461,7 @@ TEST_CASE("Deck - Deck copy constructor and assignment") {
     original.Build(ss);
 
     WHEN("We copy-construct a new deck") {
-      Rummy::Deck copy(original);
+      Rummy::SimpleDeck copy(original);
 
       THEN("All suits are present in the copy") {
         REQUIRE(copy.DoesSuitExist("/"));
@@ -483,7 +483,7 @@ TEST_CASE("Deck - Deck copy constructor and assignment") {
     }
 
     WHEN("We copy-assign a new deck") {
-      Rummy::Deck assigned;
+      Rummy::SimpleDeck assigned;
       assigned = original;
 
       THEN("All suits are present in the assigned deck") {
@@ -502,7 +502,7 @@ TEST_CASE("Deck - Deck copy constructor and assignment") {
 
 TEST_CASE("Deck - AddCard adds new suit to ordering") {
     GIVEN("An empty deck") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
 
     WHEN("We add cards to a new suit programmatically") {
       deck.AddCard("alpha", "x", 1.0);
@@ -543,7 +543,7 @@ TEST_CASE("Deck - AddCard adds new suit to ordering") {
 
 TEST_CASE("Deck - GetVector correct order for large vectors") {
   GIVEN("A deck with a vector of more than 9 elements") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "<suit1>\n";
     // Build a 12-element vector inline
@@ -565,11 +565,11 @@ TEST_CASE("Deck - GetVector correct order for large vectors") {
 
 TEST_CASE("Deck - Second Build call preserves nested suit references") {
   GIVEN("A deck with a nested suit (gas/eos)") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss1;
     ss1 << "<gas>\n"
         << "gamma = 1.4\n"
-        << "<../eos>\n"       
+        << "<./eos>\n"       
         << "cv = 1.0\n";
     deck.Build(ss1);
 
@@ -593,7 +593,7 @@ TEST_CASE("Deck - Second Build call preserves nested suit references") {
 
 TEST_CASE("Deck - WriteDeck preserves declaration order") {
   GIVEN("A deck where 'b' is declared before 'a' but 'a' references 'b'") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "<suit1>\n"
        << "z_base = 10\n"        // alphabetically last, declared first
@@ -604,7 +604,7 @@ TEST_CASE("Deck - WriteDeck preserves declaration order") {
       std::ostringstream out;
       deck.WriteDeck(out);
 
-      Rummy::Deck deck2;
+      Rummy::SimpleDeck deck2;
       std::istringstream in(out.str());
       deck2.Build(in);
 
@@ -617,7 +617,7 @@ TEST_CASE("Deck - WriteDeck preserves declaration order") {
 
 TEST_CASE("Deck - Multiline continuation preserves comment") {
   GIVEN("A deck with a multiline value") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "<suit1>\n"
        << "x = 1 +  &  # part one\n"
@@ -636,13 +636,13 @@ TEST_CASE("Deck - Multiline continuation preserves comment") {
   }
 }
 
-TEST_CASE("Deck - Relative suit name (..)") {
+TEST_CASE("Deck - Relative suit name (.)") {
   GIVEN("A deck using relative suit syntax") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "<gas>\n"
        << "name = \"hydrogen\"\n"
-       << "<../eos>\n"
+       << "<./eos>\n"
        << "gamma = 1.67\n"
        << "type = \"ideal\"\n"
        << "cv = 1.0 / (gamma - 1.0)\n";
@@ -664,7 +664,7 @@ TEST_CASE("Deck - Relative suit name (..)") {
 
 TEST_CASE("pips - Arithmetic operators") {
   GIVEN("A deck with arithmetic expressions") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "<math>\n"
        << "add      = 3 + 4\n"
@@ -694,7 +694,7 @@ TEST_CASE("pips - Arithmetic operators") {
 
 TEST_CASE("pips - Comparison and logical operators") {
   GIVEN("A deck with comparison and logical expressions") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "<logic>\n"
        << "eq_true  = 1 == 1\n"
@@ -740,7 +740,7 @@ TEST_CASE("pips - Comparison and logical operators") {
 
 TEST_CASE("pips - Bitwise operators") {
   GIVEN("A deck with bitwise expressions") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "<bits>\n"
        << "band   = 12 & 10\n"    // 0b1100 & 0b1010 = 0b1000 = 8
@@ -767,7 +767,7 @@ TEST_CASE("pips - Bitwise operators") {
 TEST_CASE("pips - Math functions") {
   GIVEN("A deck with all math function calls") {
     const double pi = std::acos(-1.0);
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "<fn>\n"
        << "pi_val  = pi\n"
@@ -891,7 +891,7 @@ static std::string captureStdout(std::function<void()> f) {
 TEST_CASE("pips - print() function") {
   GIVEN("A deck that calls print() on various types") {
     std::string output = captureStdout([] {
-      Rummy::Deck deck;
+      Rummy::SimpleDeck deck;
       std::stringstream ss;
       ss << "num = 42\n"
          << "<out>\n"
@@ -915,7 +915,7 @@ TEST_CASE("pips - print() function") {
 
   GIVEN("A deck that calls print() with multiple arguments") {
     std::string output = captureStdout([] {
-      Rummy::Deck deck;
+      Rummy::SimpleDeck deck;
       std::stringstream ss;
       ss << "<out>\n"
          << "a = 1\n"
@@ -933,7 +933,7 @@ TEST_CASE("pips - print() function") {
 TEST_CASE("pips - __globals__ command") {
   GIVEN("A deck with several variables followed by __globals__") {
     std::string output = captureStdout([] {
-      Rummy::Deck deck;
+      Rummy::SimpleDeck deck;
       std::stringstream ss;
       ss << "speed = 42\n"
          << "label = \"fast\"\n"
@@ -957,7 +957,7 @@ TEST_CASE("pips - __globals__ command") {
 
 TEST_CASE("Deck - Reopen suit and redefine card") {
   GIVEN("A deck where a suit is opened a second time to redefine a card") {
-    Rummy::Deck deck_out;
+    Rummy::SimpleDeck deck_out;
     std::string output = captureStdout([&deck_out] {
       std::stringstream ss;
       ss << "<mesh>\n"
@@ -979,7 +979,7 @@ TEST_CASE("Deck - Reopen suit and redefine card") {
 
 TEST_CASE("Deck - Dotted name redefinition") {
   GIVEN("A deck where a previously declared card is redefined using dotted syntax") {
-    Rummy::Deck deck_out;
+    Rummy::SimpleDeck deck_out;
     std::string output = captureStdout([&deck_out] {
       std::stringstream ss;
       ss << "<mesh>\n"
@@ -1001,7 +1001,7 @@ TEST_CASE("Deck - Dotted name redefinition") {
 
 TEST_CASE("Deck - Dotted name redefinition of a vector element") {
   GIVEN("A deck where one element of a previously declared vector is redefined using dotted syntax") {
-    Rummy::Deck deck_out;
+    Rummy::SimpleDeck deck_out;
     std::string output = captureStdout([&deck_out] {
       std::stringstream ss;
       ss << "<mesh>\n"
@@ -1027,7 +1027,7 @@ TEST_CASE("Deck - Dotted name redefinition of a vector element") {
 
 TEST_CASE("Deck - Dotted name redefinition of a vector slice") {
   GIVEN("A deck where a slice of a previously declared vector is redefined using dotted syntax") {
-    Rummy::Deck deck_out;
+    Rummy::SimpleDeck deck_out;
     std::string output = captureStdout([&deck_out] {
       std::stringstream ss;
       ss << "<mesh>\n"
@@ -1055,7 +1055,7 @@ TEST_CASE("Deck - Dotted name redefinition of a vector slice") {
 
 TEST_CASE("Deck - Global variable element and slice redefinition before any suit") {
   GIVEN("A deck where vector element and slice updates happen before any suit declaration") {
-    Rummy::Deck deck_out;
+    Rummy::SimpleDeck deck_out;
     std::string output = captureStdout([&deck_out] {
       std::stringstream ss;
       ss << "mesh.coords = 1, 2, 3, 4\n"
@@ -1104,7 +1104,7 @@ TEST_CASE("Deck - Include Statement") {
         << "include \"included.in\" # comment\n";
     }
 
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     deck.Build((tmp / "main.in").string());
 
     THEN("Cards from the main file are present") {

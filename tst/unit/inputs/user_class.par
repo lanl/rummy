@@ -1,0 +1,15 @@
+# User declares their own class; Deck2 should NOT auto-generate one for
+# `<Point(p)>` but should emit `var p = new Point {}` and pass the rest
+# of the block verbatim to pips.
+class Point {
+  var x
+  var y
+  fn norm_sq() {
+    return this.x * this.x + this.y * this.y
+  }
+}
+
+<Point(p)>
+p.x = 3
+p.y = 4
+setattr(p, "nsq", p.norm_sq())

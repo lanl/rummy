@@ -41,17 +41,17 @@ vars = "density", "velocity", "pressure"
 <gas>
  name = "hydrogen"
 
-<../eos>                              # relative nodes, expands to gas/eos
+<./eos>                              # child of current suit: gas/eos
  type = "ideal"         
  gamma = 5.0/3.0
  cv = 1.0/(gamma - 1.0)               # Reference local variables in your node
 
-<../conductivity>
+<./conductivity>
  kappa = hcond/(rho * gas.eos.cv)     # reference other node variables 
  
 <hydro>
  cfl = 0.8
-<../riemann>
+<./riemann>
  solver = "hllc"
 
 print(gas.conductivity.kappa)         # Print variables to stdout when the input deck is compiled
@@ -66,7 +66,7 @@ print(gas.conductivity.kappa)         # Print variables to stdout when the input
 * Vector slice operations
 * String addition
 * Boolean logical operations
-* Relative suits (`<../subnode>`)
+* Relative suits (`<./subnode>`, `<../sibling>`, `<../../uncle>`, …)
 * Global cards (i.e., no suit)
 * A `print` function that can print any previously defined card.
 * Error messages. 

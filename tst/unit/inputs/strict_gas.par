@@ -1,0 +1,26 @@
+# Strict-mode input: assumes class Gas/Eos are supplied via prepended class_defs.
+class Gas {
+  var rho
+  var T
+  var eos
+}
+
+class Eos {
+  var type = "ideal"
+  var gamma = 1.4
+}
+
+<Gas(mat1)>
+rho = 1.0
+T   = 300.0, 100.0, 200.0
+
+<./eos>
+type = "ideal"
+gamma = 5.0/3.0
+
+<Gas(mat2)>
+rho = 2.0
+T   = 350.0
+<./eos>
+type = "table"
+gamma = 1.6
