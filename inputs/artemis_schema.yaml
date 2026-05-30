@@ -1,0 +1,415 @@
+# YAML schema for the Artemis example decks.
+#
+# Each top-level mapping declares a "suit" whose value is either a *node*
+# (a class instance, indicated by `_type: node`) or a *leaf field* (a
+# `var` on the parent class, indicated by a primitive `_type`).
+#
+# Reserved keys (prefixed with `_`):
+#   _type        — `node` for class instances; otherwise a primitive
+#                  (`Real`, `int`, `bool`, `string`)
+#   _class       — implementation class name for nodes
+#                  (default: Capitalize(key))
+#   _description — free-form documentation
+#   _default     — default value for a leaf field
+#   _allowed     — inline list of permitted values for a leaf field
+
+artemis:
+  _type: node
+  _class: Artemis
+  _description: Top-level Artemis configuration block.
+  problem:
+    _type: string
+    _description: Name of the built-in problem generator to run.
+    _allowed: [disk, disk_cyl, blast, sod, advection]
+  coordinates:
+    _type: string
+    _description: Coordinate system used by the simulation.
+    _allowed: [cartesian, cylindrical, spherical]
+  physical_units:
+    _type: string
+    _description: Unit system for input/output quantities.
+    _allowed: [cgs, si, code]
+  unit_conversion:
+    _type: string
+    _description: Strategy used when converting between input and code units.
+
+parthenon:
+  _type: node
+  _class: Parthenon
+  _description: Parthenon driver configuration.
+  job:
+    _type: node
+    _class: Job
+    _description: Identifying information for this run.
+    problem_id:
+      _type: string
+      _description: Short string used as a prefix on output filenames.
+  output:
+    _type: node
+    _class: Output
+    _description: One output stream (HDF5 dump, restart, history, …).
+    variables:
+      _type: string
+      _description: Comma-separated list of fields to write.
+    file_type:
+      _type: string
+      _description: Output backend.
+      _allowed: [hdf5, rst, hst, vtk]
+    dt:
+      _type: Real
+      _description: Wall-clock interval between output writes.
+  time:
+    _type: node
+    _class: Time
+    _description: Time-integration controls.
+    nlim:
+      _type: int
+      _description: Maximum number of cycles (-1 = unlimited).
+    tlim:
+      _type: Real
+      _description: Simulation end time.
+    integrator:
+      _type: string
+      _description: Time integrator order/scheme.
+      _allowed: [rk1, rk2, rk3, vl2]
+    ncycle_out:
+      _type: int
+      _description: Cycles between status messages.
+  mesh:
+    _type: node
+    _class: Mesh
+    _description: Global mesh definition.
+    nx1:
+      _type: int
+      _description: Cell count along x1.
+    x1min:
+      _type: Real
+      _description: Lower bound of x1.
+    x1max:
+      _type: Real
+      _description: Upper bound of x1.
+    ix1_bc:
+      _type: string
+      _description: Inner-x1 boundary condition.
+      _allowed: [periodic, outflow, reflecting, ic, user]
+    ox1_bc:
+      _type: string
+      _description: Outer-x1 boundary condition.
+      _allowed: [periodic, outflow, reflecting, ic, user]
+    nx2:
+      _type: int
+      _description: Cell count along x2.
+    x2min:
+      _type: Real
+      _description: Lower bound of x2.
+    x2max:
+      _type: Real
+      _description: Upper bound of x2.
+    ix2_bc:
+      _type: string
+      _description: Inner-x2 boundary condition.
+      _allowed: [periodic, outflow, reflecting, ic, user]
+    ox2_bc:
+      _type: string
+      _description: Outer-x2 boundary condition.
+      _allowed: [periodic, outflow, reflecting, ic, user]
+    nx3:
+      _type: int
+      _description: Cell count along x3.
+    x3min:
+      _type: Real
+      _description: Lower bound of x3.
+    x3max:
+      _type: Real
+      _description: Upper bound of x3.
+    ix3_bc:
+      _type: string
+      _description: Inner-x3 boundary condition.
+      _allowed: [periodic, outflow, reflecting, ic, user]
+    ox3_bc:
+      _type: string
+      _description: Outer-x3 boundary condition.
+      _allowed: [periodic, outflow, reflecting, ic, user]
+  swarm:
+    _type: node
+    _class: Swarm
+    _description: Particle-swarm boundary configuration.
+    ix1_bc:
+      _type: string
+      _description: Inner-x1 swarm boundary.
+      _allowed: [periodic, outflow, reflecting, user]
+    ox1_bc:
+      _type: string
+      _description: Outer-x1 swarm boundary.
+      _allowed: [periodic, outflow, reflecting, user]
+    ix2_bc:
+      _type: string
+      _description: Inner-x2 swarm boundary.
+      _allowed: [periodic, outflow, reflecting, user]
+    ox2_bc:
+      _type: string
+      _description: Outer-x2 swarm boundary.
+      _allowed: [periodic, outflow, reflecting, user]
+    ix3_bc:
+      _type: string
+      _description: Inner-x3 swarm boundary.
+      _allowed: [periodic, outflow, reflecting, user]
+    ox3_bc:
+      _type: string
+      _description: Outer-x3 swarm boundary.
+      _allowed: [periodic, outflow, reflecting, user]
+  meshblock:
+    _type: node
+    _class: Meshblock
+    _description: Per-meshblock decomposition.
+    nx1:
+      _type: int
+      _description: Block size along x1.
+    nx2:
+      _type: int
+      _description: Block size along x2.
+    nx3:
+      _type: int
+      _description: Block size along x3.
+
+physics:
+  _type: node
+  _class: Physics
+  _description: Toggles for physical packages.
+  gas:
+    _type: bool
+    _description: Enable hydrodynamics package.
+    _default: false
+  radiation:
+    _type: bool
+    _description: Enable radiation transport.
+    _default: false
+  dust:
+    _type: bool
+    _description: Enable dust species.
+    _default: false
+  viscosity:
+    _type: bool
+    _description: Enable viscous diffusion.
+    _default: false
+  nbody:
+    _type: bool
+    _description: Enable N-body integration.
+    _default: false
+  gravity:
+    _type: bool
+    _description: Enable gravity.
+    _default: false
+
+gas:
+  _type: node
+  _class: Gas
+  _description: Hydrodynamics solver settings.
+  gamma:
+    _type: Real
+    _description: Adiabatic index.
+  mu:
+    _type: Real
+    _description: Mean molecular weight.
+  cfl:
+    _type: Real
+    _description: Courant number.
+  reconstruct:
+    _type: string
+    _description: Spatial reconstruction method.
+    _allowed: [pcm, plm, ppm, weno5]
+  riemann:
+    _type: string
+    _description: Riemann solver.
+    _allowed: [hllc, hlle, llf, roe]
+  dfloor:
+    _type: Real
+    _description: Density floor.
+  siefloor:
+    _type: Real
+    _description: Specific internal energy floor.
+  eos:
+    _type: node
+    _class: Eos
+    _description: Equation of state container.
+    ideal:
+      _type: node
+      _class: Ideal
+      _description: Ideal-gas EOS parameters.
+      gamma:
+        _type: Real
+        _description: Ideal-gas adiabatic index.
+  viscosity:
+    _type: node
+    _class: Viscosity
+    _description: Viscosity sub-model.
+    type:
+      _type: string
+      _description: Viscosity prescription.
+      _allowed: [alpha, constant, none]
+    alpha:
+      _type: Real
+      _description: Shakura-Sunyaev alpha (when `type = alpha`).
+  opacity:
+    _type: node
+    _class: Opacity
+    _description: Opacity model container.
+    absorption:
+      _type: node
+      _class: Absorption
+      _description: Absorption-opacity parameters.
+      opacity_model:
+        _type: string
+        _description: Functional form of the opacity.
+        _allowed: [constant, power_law, kramers, tabulated]
+      coef_kappa_a:
+        _type: Real
+        _description: Reference absorption coefficient.
+      rho_exp:
+        _type: Real
+        _description: Density exponent in the power-law model.
+      temp_exp:
+        _type: Real
+        _description: Temperature exponent in the power-law model.
+
+gravity:
+  _type: node
+  _class: Gravity
+  _description: Gravity solver configuration.
+  nbody:
+    _type: node
+    _class: Nbody
+    _description: N-body system attached to the gravity solver.
+    integrator:
+      _type: string
+      _description: N-body time integrator.
+      _allowed: [rk2, rk4, leapfrog, kdk]
+    particle:
+      _type: node
+      _class: Particle
+      _description: A single N-body particle.
+      mass:
+        _type: Real
+        _description: Particle mass.
+      couple:
+        _type: int
+        _description: Coupling flag (0 = passive, 1 = active).
+        _allowed: [0, 1]
+      soft:
+        _type: node
+        _class: Soft
+        _description: Gravitational-softening kernel.
+        type:
+          _type: string
+          _description: Softening kernel shape.
+          _allowed: [none, plummer, spline]
+        radius:
+          _type: Real
+          _description: Softening radius.
+      initialize:
+        _type: node
+        _class: Initialize
+        _description: Initial position and velocity.
+        x1:
+          _type: Real
+          _description: Initial x1 coordinate.
+          _default: 0.0
+        x2:
+          _type: Real
+          _description: Initial x2 coordinate.
+          _default: 0.0
+        x3:
+          _type: Real
+          _description: Initial x3 coordinate.
+          _default: 0.0
+        vx1:
+          _type: Real
+          _description: Initial x1 velocity.
+          _default: 0.0
+        vx2:
+          _type: Real
+          _description: Initial x2 velocity.
+          _default: 0.0
+        vx3:
+          _type: Real
+          _description: Initial x3 velocity.
+          _default: 0.0
+    binary:
+      _type: node
+      _class: Binary
+      _description: Two-body binary configuration.
+      primary:
+        _type: string
+        _description: Particle name of the primary body.
+      secondary:
+        _type: string
+        _description: Particle name of the secondary body.
+      a:
+        _type: Real
+        _description: Semi-major axis.
+      mass:
+        _type: Real
+        _description: Total system mass.
+
+radiation:
+  _type: node
+  _class: Radiation
+  _description: Radiation transport package.
+  moment:
+    _type: node
+    _class: Moment
+    _description: Moment-method radiation solver.
+    cfl:
+      _type: Real
+      _description: Radiation Courant number.
+    riemann:
+      _type: string
+      _description: Radiation Riemann solver.
+      _allowed: [hll, llf]
+    reconstruct:
+      _type: string
+      _description: Radiation reconstruction.
+      _allowed: [pcm, plm, ppm]
+    efloor:
+      _type: Real
+      _description: Radiation energy floor.
+    closure:
+      _type: string
+      _description: Closure relation.
+      _allowed: [m1, p1, eddington]
+    creduc:
+      _type: Real
+      _description: Reduced speed of light factor.
+  imc:
+    _type: node
+    _class: Imc
+    _description: Implicit Monte-Carlo settings.
+    use_ddmc:
+      _type: bool
+      _description: Use discrete diffusion Monte Carlo.
+    num_particles:
+      _type: int
+      _description: Particles per cycle.
+
+problem:
+  _type: node
+  _class: Problem
+  _description: Problem-generator parameters.
+  r0:
+    _type: Real
+    _description: Reference radius.
+  rho0:
+    _type: Real
+    _description: Reference density.
+  dslope:
+    _type: Real
+    _description: Density power-law slope.
+  flare:
+    _type: Real
+    _description: Disk flaring index.
+  h0:
+    _type: Real
+    _description: Reference scale height.
+  polytropic_index:
+    _type: Real
+    _description: Polytropic index of the initial profile.

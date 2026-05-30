@@ -27,6 +27,8 @@
 
 #include "deck_base.hpp"
 #include "deck_graph.hpp"
+#include "yaml_schema.hpp"
+#include <optional>
 #include <pips/device/device_chunk.hpp>
 #include <pips/device/device_pack.hpp>
 #include <pips/device/device_value.hpp>
@@ -60,21 +62,27 @@ class FullDeck : public DeckBase {
   // Field-discovery strictness:
   //  - Loose (default): fields are attached at runtime via `setattr`, so
   //    classes may be empty stubs and instances can grow arbitrary fields.
-  //  - Strict: user supplies complete class definitions (via ctor argument
-  //    `class_defs`).  Lowering uses direct `obj.field = expr` assignment
-  //    (no setattr), so writing to an undeclared field is a pips error.
-  //    Instantiating an instance of a class that does not appear in the
-  //    provided definitions is a fatal Rummy error.
+  //  - Strict: caller supplies a YAML schema (via ctor argument `schema`)
+  //    that declares every class with its fields and defaults.  Lowering
+  //    uses direct `obj.field = expr` assignment (no setattr), so writing
+  //    to an undeclared field is a pips error.  Instantiating a class not
+  //    in the schema is a fatal Rummy error.
   enum class Mode { Loose, Strict };
 
   FullDeck() = default;
-  // Construct with an explicit mode and an optional string of pips class
-  // definitions to prepend to every Build call.  In Strict mode `class_defs`
-  // is the single source of truth for declared classes.
-  explicit FullDeck(Mode mode, std::string class_defs = "")
-      : mode_(mode), class_defs_(std::move(class_defs)) {}
+  // Construct with an explicit mode and no schema.  Strict mode requires a
+  // schema (lowering will fail at Build time if none is supplied).
+  explicit FullDeck(Mode mode) : mode_(mode) {}
+  // Construct with an explicit mode and a YAML schema describing the deck's
+  // classes.  In Strict mode the schema is the single source of truth for
+  // declared classes and their fields.
+  FullDeck(Mode mode, Schema schema)
+      : mode_(mode), schema_(std::move(schema)) {}
+  // Convenience: load the schema from a YAML file path.
+  FullDeck(Mode mode, const std::string &schema_path)
+      : mode_(mode), schema_(Schema::FromFile(schema_path)) {}
   FullDeck(const FullDeck &other)
-      : DeckBase(other), mode_(other.mode_), class_defs_(other.class_defs_),
+      : DeckBase(other), mode_(other.mode_), schema_(other.schema_),
         suit_to_vm_name_(other.suit_to_vm_name_),
         suit_class_name_(other.suit_class_name_) {
     RebuildInstanceRegistry();
@@ -83,7 +91,7 @@ class FullDeck : public DeckBase {
     if (this != &other) {
       DeckBase::operator=(other);
       mode_ = other.mode_;
-      class_defs_ = other.class_defs_;
+      schema_ = other.schema_;
       suit_to_vm_name_ = other.suit_to_vm_name_;
       suit_class_name_ = other.suit_class_name_;
       RebuildInstanceRegistry();
@@ -207,9 +215,10 @@ class FullDeck : public DeckBase {
 
   // Lowering / validation mode.  See enum Mode for semantics.
   Mode mode_ = Mode::Loose;
-  // Pips class definitions prepended to every Build call.  In Strict mode,
-  // the names declared here form the closed set of valid classes.
-  std::string class_defs_;
+  // Optional YAML schema describing classes/fields/defaults.  In Strict
+  // mode this is required; in Loose mode it merely augments class-name
+  // resolution and field defaults.
+  std::optional<Schema> schema_;
 
   // Per-suit instance registry, populated post-interpret by the readback.
   std::unordered_map<pips::Instance *, std::string> instance_to_suit_;

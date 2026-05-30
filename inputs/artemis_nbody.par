@@ -11,14 +11,30 @@
 #  the public, perform publicly and display publicly, and to permit others to do so.
 # ========================================================================================
 
-include "artemis_class.par"
+fn finalize() {
+    print("Done parsing")
+}
+
+fn nu(r) {
+    return alpha * h * h * sqrt(r)
+}
+fn density(r) {
+    # 3*pi*nu*rho = mdot
+    return mdot/(3*pi*nu(r)) 
+}
+
+h = .05
+alpha = 1e-3
+mdot = 3*pi * alpha * h**2 * 1.0 
+
+title = "nbody_test"
 
 <artemis>
 problem = "disk"             # name of the pgen
 coordinates = "cylindrical"  # coordinate system
 
 <parthenon/job>
-problem_id = "disk_cyl"  # problem ID: basename of output filenames
+problem_id = title  # problem ID: basename of output filenames
 
 <parthenon/output(out1)>
 variables = "gas.prim.density",  &
@@ -29,11 +45,11 @@ dt        = 0.1   # time increment between outputs
 
 <parthenon/output(out2)>
 file_type = "rst"
-dt = 6.28
+dt = 2*pi
 
 <parthenon/time>
 nlim       = -1    # cycle limit
-tlim       = 62.8  # time limit
+tlim       = 10*parthenon.out2.dt # time limit
 integrator = "rk2"   # time integration algorithm
 ncycle_out = 1     # interval for stdout summary info
 
@@ -44,9 +60,9 @@ x1max  = 4.3                 # maximum value of X1
 ix1_bc = "ic"                  # Inner-X1 boundary condition flag
 ox1_bc = "ic"                  # Outer-X1 boundary condition flag
 
-nx2    = 64                  # Number of zones in X2-direction
-x2min  = -3.141592653589793  # minimum value of X2
-x2max  = 3.141592653589793   # maximum value of X2
+nx2    = nx2                  # Number of zones in X2-direction
+x2min  = -pi  # minimum value of X2
+x2max  = pi   # maximum value of X2
 ix2_bc = "periodic"            # Inner-X2 boundary condition flag
 ox2_bc = "periodic"            # Outer-X2 boundary condition flag
 
@@ -80,7 +96,7 @@ gamma = 1.4
 
 <gas/viscosity>
 type = "alpha"
-alpha = 1e-3
+alpha = alpha
 
 
 <gravity/nbody>
@@ -110,9 +126,11 @@ a = 1.0
 mass = 1.0
 
 <problem>
-r0 = 1.0
-rho0 = 1.0
+r0 = gravity.nbody.binary.a * .5
+rho0 = density(r0*2)
 dslope = -2.25
 flare = 0.25
-h0 = 0.05
+h0 = h
 polytropic_index = 1
+
+finalize()

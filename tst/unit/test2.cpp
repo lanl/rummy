@@ -18,6 +18,7 @@
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 #include "full_deck.hpp"
+#include "yaml_schema.hpp"
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
@@ -757,33 +758,45 @@ TEST_CASE("Deck2 - Relative header ./ anchors to last absolute suit") {
   // relative to the same base suit (the last block opened with an absolute
   // path), not to each other.
   // ../ goes up one level, ../../ goes up two, etc.
-  const std::string defs = R"(
-class Gravity {
-  var nbody
-}
-class Nbody {
-  var integrator
-  var particle
-  var binary
-}
-class Particle {
-  var mass
-  var couple
-  var soft
-  var initialize
-}
-class Soft {
-  var type
-}
-class Initialize {}
-class Binary {
-  var primary
-  var secondary
-  var a
-  var mass
-}
+  // YAML schema covering all classes used by this test.
+  const std::string schema_yaml = R"(
+gravity:
+  _type: node
+  _class: Gravity
+  nbody:
+    _type: node
+    _class: Nbody
+    integrator:
+      _type: string
+    particle:
+      _type: node
+      _class: Particle
+      mass:
+        _type: Real
+      couple:
+        _type: int
+      soft:
+        _type: node
+        _class: Soft
+        type:
+          _type: string
+      initialize:
+        _type: node
+        _class: Initialize
+    binary:
+      _type: node
+      _class: Binary
+      primary:
+        _type: string
+      secondary:
+        _type: string
+      a:
+        _type: Real
+      mass:
+        _type: Real
 )";
-  Rummy::FullDeck d(Rummy::FullDeck::Mode::Strict, defs);
+  Rummy::FullDeck d(Rummy::FullDeck::Mode::Strict,
+                    Rummy::Schema::FromString(schema_yaml));
   std::stringstream ss;
   ss << "<gravity/nbody>\n"
      << "integrator = \"none\"\n"

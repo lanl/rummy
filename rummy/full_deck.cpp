@@ -636,7 +636,13 @@ void ClassifyBlock(Block &b, FullDeck::Mode mode) {
     const std::string &raw = dl.raw;
     if (StartsWithPipsKeyword(raw)) { b.mode = BlockMode::Pips; return; }
     auto eq = FindAssign(raw);
-    if (eq == std::string::npos) { b.mode = BlockMode::Pips; return; }
+    if (eq == std::string::npos) {
+      // Lines without an `=` (e.g. `finalize()`) are treated as expression
+      // statements within a declarative block.  They're emitted verbatim by
+      // the line-by-line path below; no `=` means they don't introduce an
+      // LHS base, so they don't conflict with declarative classification.
+      continue;
+    }
     std::string lhs = raw.substr(0, eq);
     RemoveTrailingWhitespace(lhs); RemoveLeadingWhitespace(lhs);
     if (lhs.find('.') != std::string::npos) { b.mode = BlockMode::Pips; return; }
@@ -654,6 +660,7 @@ void ClassifyBlock(Block &b, FullDeck::Mode mode) {
     for (const auto &dl : b.lines) {
       const std::string &raw = dl.raw;
       auto eq = FindAssign(raw);
+      if (eq == std::string::npos) continue;
       std::string rhs = raw.substr(eq + 1);
       for (const auto &base : lhs_bases) {
         if (ExprMentions(rhs, base)) { b.mode = BlockMode::Pips; return; }
@@ -757,8 +764,18 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
   // sees them as ordinary globals.  This makes Strict-mode validation and
   // Loose-mode `user_declared_classes` tracking work uniformly across
   // incremental builds.
+  if (mode_ == Mode::Strict && (!schema_.has_value() || schema_->Empty())) {
+    std::stringstream m;
+    m << "Strict mode requires a YAML schema; construct FullDeck(Mode::Strict, "
+         "Schema::FromFile(...)) or FullDeck(Mode::Strict, schema_path).";
+    fatal(m);
+  }
   std::stringstream combined;
-  if (!class_defs_.empty()) combined << class_defs_ << "\n";
+  std::string schema_class_defs;
+  if (schema_.has_value() && !schema_->Empty()) {
+    schema_class_defs = schema_->EmitClassDefs();
+    combined << schema_class_defs << "\n";
+  }
   combined << ss.rdbuf();
 
   std::string combined_str = combined.str();
@@ -842,15 +859,21 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
     const auto &nodes = blk.header.node_names;
     if (eff_parts.size() != nodes.size()) continue; // shouldn't happen
     std::string acc;
+    std::string canon; // canonical (un-aliased) path used for schema lookup
     for (size_t i = 0; i < nodes.size(); ++i) {
       if (!acc.empty()) acc += "/";
       acc += eff_parts[i];
+      if (!canon.empty()) canon += "/";
+      canon += nodes[i];
       // Insert-if-absent: when `..` substitution rewrites a header using
       // already-aliased segment names, those segments arrive as their own
       // node names (no alias), which would Capitalize incorrectly.  The
       // FIRST block that declares a segment is the authoritative source
       // for its class name.
-      suit_class_name_.emplace(acc, Capitalize(nodes[i]));
+      std::string cls;
+      if (schema_.has_value()) cls = schema_->ClassFor(canon);
+      if (cls.empty()) cls = Capitalize(nodes[i]);
+      suit_class_name_.emplace(acc, cls);
       if (eff_parts[i] != nodes[i])
         suit_parent_field_.emplace(acc, nodes[i]);
     }
@@ -1496,6 +1519,13 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
         for (const auto &dl : blk.lines) {
           const std::string &raw = dl.raw;
           auto eq = FindAssign(raw);
+          if (eq == std::string::npos) {
+            // Expression statement (e.g. `finalize()`).  Emit verbatim with
+            // same-block-LHS rewriting so bare references to instance fields
+            // resolve correctly (e.g. `density(r0)` -> `density(problem.r0)`).
+            emit_line(tr(raw), dl.loc);
+            continue;
+          }
           std::string lhs = raw.substr(0, eq);
           std::string rhs = raw.substr(eq + 1);
           RemoveTrailingWhitespace(lhs); RemoveLeadingWhitespace(lhs);

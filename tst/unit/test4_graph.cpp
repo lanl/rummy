@@ -11,6 +11,7 @@
 
 #include "deck_graph.hpp"
 #include "full_deck.hpp"
+#include "yaml_schema.hpp"
 #include <algorithm>
 #include <fstream>
 #include <sstream>
@@ -38,9 +39,8 @@ static const Rummy::DeckNode *child_named(const Rummy::DeckNode &n,
 
 // Build a small two-material deck used by most of the test cases.
 static std::unique_ptr<Rummy::FullDeck> make_gas_deck() {
-  const std::string defs = slurp(fixture("strict_classes.par"));
-  auto d = std::make_unique<Rummy::FullDeck>(Rummy::FullDeck::Mode::Strict,
-                                              defs);
+  auto d = std::make_unique<Rummy::FullDeck>(
+      Rummy::FullDeck::Mode::Strict, fixture("strict_schema.yaml"));
   d->Build(fixture("strict_gas.par"));
   return d;
 }
@@ -183,21 +183,32 @@ TEST_CASE("DeckGraph - Save round-trips through Build") {
 }
 
 TEST_CASE("DeckGraph - Save preserves top-level source order") {
-  std::stringstream defs;
-  defs << "class Pc { var c; }\n"
-       << "class Mesh { var nx1; }\n"
-       << "class Physics { var enabled; }\n";
+  const std::string schema_yaml = R"(
+Pc:
+  _type: node
+  c:
+    _type: Real
+Mesh:
+  _type: node
+  nx1:
+    _type: int
+Physics:
+  _type: node
+  enabled:
+    _type: bool
+)";
 
   std::stringstream deck;
   deck << "dt = 1.0e-3\n\n"
-    << "<pc>\n"
+    << "<Pc(pc)>\n"
        << "c = 3.0e10\n\n"
-       << "<mesh>\n"
+       << "<Mesh(mesh)>\n"
        << "nx1 = 64\n\n"
-       << "<physics>\n"
+       << "<Physics(physics)>\n"
        << "enabled = true\n";
 
-  Rummy::FullDeck d(Rummy::FullDeck::Mode::Strict, defs.str());
+  Rummy::FullDeck d(Rummy::FullDeck::Mode::Strict,
+                    Rummy::Schema::FromString(schema_yaml));
   d.Build(deck);
 
   std::ostringstream os;

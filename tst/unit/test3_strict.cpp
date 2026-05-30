@@ -4,14 +4,15 @@
 
 // Strict-mode tests for FullDeck.  The strict mode lowers field assignments
 // as `instance.field = value` (no setattr) and requires every instantiated
-// class to be supplied via the ctor's class_defs argument.  Writing an
-// unknown class is a fatal Rummy error; writing an undeclared field is a
-// pips compile-time error.
+// class to be supplied via a YAML schema passed to the FullDeck ctor.
+// Writing an unknown class is a fatal Rummy error; writing an undeclared
+// field is a pips compile-time error.
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include "full_deck.hpp"
+#include "yaml_schema.hpp"
 #include <fstream>
 #include <sstream>
 
@@ -21,17 +22,9 @@ static std::string fixture(const std::string &name) {
   return std::string(RUMMY_TEST_INPUT_DIR) + "/" + name;
 }
 
-// Load a fixture file into a string (used to feed class definitions into the
-// FullDeck constructor at "build time").
-static std::string slurp(const std::string &path) {
-  std::ifstream in(path);
-  std::stringstream ss; ss << in.rdbuf();
-  return ss.str();
-}
-
-TEST_CASE("Strict - basic Gas materials with prepended class defs") {
-  const std::string defs = slurp(fixture("strict_classes.par"));
-  Rummy::FullDeck d(Rummy::FullDeck::Mode::Strict, defs);
+TEST_CASE("Strict - basic Gas materials with YAML schema") {
+  Rummy::FullDeck d(Rummy::FullDeck::Mode::Strict,
+                    fixture("strict_schema.yaml"));
   d.Build(fixture("strict_gas.par"));
 
   // Schema metadata is the same as loose mode.

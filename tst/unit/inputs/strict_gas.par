@@ -1,14 +1,4 @@
-# Strict-mode input: assumes class Gas/Eos are supplied via prepended class_defs.
-class Gas {
-  var rho
-  var T
-  var eos
-}
-
-class Eos {
-  var type = "ideal"
-  var gamma = 1.4
-}
+# Strict-mode input: classes Gas/Eos come from the YAML schema fixture.
 
 <Gas(mat1)>
 rho = 1.0
