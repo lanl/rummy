@@ -363,18 +363,24 @@ void SimpleDeck::CompileStream(std::istream &ss, std::map<std::string, CardMeta>
           // Strip the joining dot between suit path and field (if any).
           std::string tail = remainder;
           if (!tail.empty() && tail.front() == '.') tail.erase(0, 1);
-          // Legacy decks store vector elements as literal field names like
-          // "coords[0]" rather than as a single vector field. The new pips
-          // compiler does strict class-field validation, so a direct access
-          // like `mesh.coords[0]` fails — `coords` is not a class field.
-          // Route bracket-name accesses through getattr() so the literal
-          // field name "coords[0]" is looked up at runtime. Only apply when
-          // the field tail has a single segment that itself contains a [.
+
           auto first_bracket = tail.find('[');
           if (first_bracket != std::string::npos &&
               tail.find('.') == std::string::npos) {
-            replacement = "getattr(" + SuitObjectPath(best_suit) + ", \"" +
-                          tail + "\")";
+            std::string base_part = tail.substr(0, first_bracket);
+            pips::Value field_val;
+            bool is_native_vec =
+                !base_part.empty() &&
+                TryLookupValue(vm,
+                               SuitObjectPath(best_suit) + "." + base_part,
+                               field_val) &&
+                field_val.type == pips::ValueType::VECTOR;
+            if (is_native_vec) {
+              replacement = SuitObjectPath(best_suit) + "." + tail;
+            } else {
+              replacement = "getattr(" + SuitObjectPath(best_suit) + ", \"" +
+                            tail + "\")";
+            }
           } else {
             replacement = SuitObjectPath(best_suit) + remainder;
           }
@@ -879,6 +885,53 @@ void SimpleDeck::CompileStream(std::istream &ss, std::map<std::string, CardMeta>
       // a = 2
       // a[0] = 2
       // a = b[0]
+      //
+      // Special sub-case: a[i] = val where a already exists as a native pips
+      // vector. Use a direct pips index-assignment expression so the in-place
+      // update is reflected in the single vector card, rather than creating a
+      // separate per-element string field.
+      if (lhs_vec) {
+        auto bracket_pos = local_name.find('[');
+        std::string base_field = (bracket_pos != std::string::npos)
+                                     ? local_name.substr(0, bracket_pos)
+                                     : local_name;
+        pips::Value existing;
+        bool is_native_vec = false;
+        std::string native_lhs;
+        std::string vec_global_name;
+
+        if (!curr_suit.empty() && !base_field.empty()) {
+          std::string vm_base = SuitObjectPath(curr_suit) + "." + base_field;
+          if (TryLookupValue(vm, vm_base, existing) &&
+              existing.type == pips::ValueType::VECTOR) {
+            is_native_vec = true;
+            native_lhs = SuitObjectPath(curr_suit) + "." + local_name;
+            vec_global_name = name_prefix + base_field;
+          }
+        } else if (curr_suit.empty() && !base_field.empty()) {
+          if (TryLookupValue(vm, base_field, existing) &&
+              existing.type == pips::ValueType::VECTOR) {
+            is_native_vec = true;
+            native_lhs = local_name;
+            vec_global_name = base_field;
+          }
+        }
+
+        if (is_native_vec) {
+          std::string expr =
+              native_lhs + " = " + translateSuitPathsForVm(card_value);
+          if (vm.interpret(expr.c_str(), '\n', locals) != pips::InterpretResult::OK) {
+            std::stringstream msg;
+            msg << "Failed to compile expression '" << expr << "' at line " << line_num;
+            fatal(msg);
+          }
+          auto vec_value = lookupValueOrFatal(vec_global_name, line_num);
+          meta[vec_global_name] = {line_num, comment};
+          comment.clear();
+          locals[base_field.c_str()] = vec_value;
+          continue;
+        }
+      }
       std::string expr;
       if (curr_suit.empty()) {
         expr = "var " + global_name + " = " + translateSuitPathsForVm(card_value);
@@ -898,95 +951,80 @@ void SimpleDeck::CompileStream(std::istream &ss, std::map<std::string, CardMeta>
       // Stash the local for this suit
       locals[local_name.c_str()] = value;
     } else if (!lhs_vec && rhs_vec) {
-      // a = [1,2,3]
-      // loop through comma separated values
-      auto open_bracket = card_value_stripped.find_first_of('[');
-      if (open_bracket != std::string::npos) {
-        auto close_bracket = card_value_stripped.find_first_of(']', open_bracket);
-        card_value_stripped = card_value_stripped.substr(
-            open_bracket + 1, close_bracket - open_bracket - 1);
+      // a = [1,2,3]  or  a = 1,2,3
+      // Treat the whole RHS as a single native pips vector assignment.
+      // If the RHS is a bare comma-separated list (no brackets), wrap it.
+      std::string vec_expr;
+      if (open_bracket == std::string::npos) {
+        vec_expr = "[" + card_value + "]";
+      } else {
+        vec_expr = card_value;
       }
-
-      // Split card_value_stripped by commas, but ignore commas inside quotes
-      std::vector<std::string> values;
-      std::string current;
-      bool in_quotes = false;
-      for (size_t i = 0; i < card_value_stripped.size(); ++i) {
-        char c = card_value_stripped[i];
-        if (c == '"') {
-          in_quotes = !in_quotes;
-          current += c;
-        } else if (c == ',' && !in_quotes) {
-          values.push_back(current);
-          current.clear();
-        } else {
-          current += c;
-        }
-      }
-      if (!current.empty()) {
-        values.push_back(current);
-      }
-      // For globals, the new pips compiler rejects `var name[X] = v` as an
-      // invalid assignment target. Emit a single native-vector declaration
-      // up-front; per-element cards are then materialised from the vector.
+      std::string expr;
       if (curr_suit.empty()) {
-        std::string vec_expr = "var " + global_name + " = [";
-        for (size_t i = 0; i < values.size(); ++i) {
-          if (i > 0) vec_expr += ", ";
-          std::string v = values[i];
-          RemoveWhitespacePreserveQuotes(v, line_num);
-          EmptyCheck(v, line_num);
-          vec_expr += translateSuitPathsForVm(v);
-        }
-        vec_expr += "]";
-        if (vm.interpret(vec_expr.c_str(), '\n', locals) !=
-            pips::InterpretResult::OK) {
-          std::stringstream msg;
-          msg << "Failed to compile expression '" << vec_expr << "' at line "
-              << line_num;
-          fatal(msg);
-        }
-        auto vec_value = lookupValueOrFatal(global_name, line_num);
-        if (vec_value.type == pips::ValueType::VECTOR && vec_value.as.vector) {
-          for (size_t i = 0; i < vec_value.as.vector->elements.size(); ++i) {
-            std::string vec_name = global_name + "[" + std::to_string(i) + "]";
-            meta[vec_name.c_str()] = {line_num, comment};
-            const pips::Value &elem = vec_value.as.vector->elements[i];
-            locals[vec_name.c_str()] = elem;
-            // Legacy lookups (TryLookupValue, GetVector) expect a per-element
-            // global keyed "name[0]", "name[1]", ... Mirror them here.
-            vm.globals[vec_name] = elem;
-          }
-        }
-        comment.clear();
-        continue;
+        expr = "var " + global_name + " = " + translateSuitPathsForVm(vec_expr);
+      } else {
+        expr = "setattr(" + object_path + ", \"" + local_name + "\", " +
+               translateSuitPathsForVm(vec_expr) + ")";
       }
-      int index = 0;
-      for (auto &value : values) {
-        RemoveWhitespacePreserveQuotes(value, line_num);
-        EmptyCheck(value, line_num);
-        // add the local card to the locals table
-        std::string vec_name = global_name + "[" + std::to_string(index) + "]";
-        std::string expr;
-        std::string field_name = local_name + "[" + std::to_string(index) + "]";
-        expr = "setattr(" + object_path + ", \"" + field_name + "\", " +
-               translateSuitPathsForVm(value) + ")";
-        if (vm.interpret(expr.c_str(), '\n', locals) != pips::InterpretResult::OK) {
-          std::stringstream msg;
-          msg << "Failed to compile expression '" << expr << "' at line " << line_num;
-          fatal(msg);
-        }
-        auto vec_value = lookupValueOrFatal(vec_name, line_num);
-        meta[vec_name.c_str()] = {line_num, comment};
-        comment.clear();
-        // Stash the local for this suit
-        std::string local_vec_name = local_name + "[" + std::to_string(index) + "]";
-        locals[local_vec_name.c_str()] = vec_value;
-        index++;
+      if (vm.interpret(expr.c_str(), '\n', locals) != pips::InterpretResult::OK) {
+        std::stringstream msg;
+        msg << "Failed to compile expression '" << expr << "' at line " << line_num;
+        fatal(msg);
       }
+      auto value = lookupValueOrFatal(global_name, line_num);
+      meta[global_name] = {line_num, comment};
+      comment.clear();
+      locals[local_name.c_str()] = value;
     } else {
       // a[1:2] = [1,2]
       // a[:2] = b[:2]
+      // When the LHS base field is already a native pips vector, emit a
+      // single pips slice-assignment expression that modifies the vector
+      // in-place, updating the single vector card rather than creating
+      // separate per-element fields.
+      auto lb = local_name.find('[');
+      std::string base_field =
+          (lb != std::string::npos) ? local_name.substr(0, lb) : local_name;
+      {
+        pips::Value existing;
+        bool is_native_vec = false;
+        std::string native_lhs;
+        std::string vec_global_name;
+
+        if (!curr_suit.empty() && !base_field.empty()) {
+          std::string vm_base = SuitObjectPath(curr_suit) + "." + base_field;
+          if (TryLookupValue(vm, vm_base, existing) &&
+              existing.type == pips::ValueType::VECTOR) {
+            is_native_vec = true;
+            native_lhs = SuitObjectPath(curr_suit) + "." + local_name;
+            vec_global_name = name_prefix + base_field;
+          }
+        } else if (curr_suit.empty() && !base_field.empty()) {
+          if (TryLookupValue(vm, base_field, existing) &&
+              existing.type == pips::ValueType::VECTOR) {
+            is_native_vec = true;
+            native_lhs = local_name;
+            vec_global_name = base_field;
+          }
+        }
+
+        if (is_native_vec) {
+          std::string expr =
+              native_lhs + " = " + translateSuitPathsForVm(card_value);
+          if (vm.interpret(expr.c_str(), '\n', locals) != pips::InterpretResult::OK) {
+            std::stringstream msg;
+            msg << "Failed to compile expression '" << expr << "' at line "
+                << line_num;
+            fatal(msg);
+          }
+          auto vec_value = lookupValueOrFatal(vec_global_name, line_num);
+          meta[vec_global_name] = {line_num, comment};
+          comment.clear();
+          locals[base_field.c_str()] = vec_value;
+          continue;
+        }
+      }
       // These are handled by replicating the line and substituting the indices
       auto card_values = SplitString(card_value_stripped, line_num);
       auto card_names = SplitString(local_name, line_num, card_values.size());
@@ -1021,6 +1059,23 @@ void SimpleDeck::CompileStream(std::istream &ss, std::map<std::string, CardMeta>
         comment.clear();
         // Stash the local for this suit
         locals[local_vec_name.c_str()] = value;
+      }
+      // Mirror the slice as a native pips vector in `locals` so that later
+      // expressions referencing the field (e.g. `base[0]`) resolve through
+      // GET_GLOBAL / GET_INDEX rather than failing. No meta entry is created,
+      // so GetVector continues to use the per-element deck cards, preserving
+      // UpdateVector / GetCard compatibility.
+      if (!curr_suit.empty() && !base_field.empty()) {
+        std::string mirror_expr = "setattr(" + object_path + ", \"" +
+                                  base_field + "\", " +
+                                  translateSuitPathsForVm(card_value) + ")";
+        if (vm.interpret(mirror_expr.c_str(), '\n', locals) == pips::InterpretResult::OK) {
+          pips::Value mirror_val;
+          if (TryLookupValue(vm, SuitObjectPath(curr_suit) + "." + base_field,
+                             mirror_val)) {
+            locals[base_field.c_str()] = mirror_val;
+          }
+        }
       }
     }
 

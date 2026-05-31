@@ -125,6 +125,13 @@ bool DeckBase::IsCardVector(const std::string &suit,
                             const std::string &name) const {
   auto suit_it = deck.find(suit);
   if (suit_it == deck.end()) return false;
+  // Check for a native vector card stored as a single entry.
+  auto card_it = suit_it->second.find(name);
+  if (card_it != suit_it->second.end() &&
+      card_it->second.GetValue().type == pips::ValueType::VECTOR) {
+    return true;
+  }
+  // Check for per-element legacy cards (name[0], name[1], ...).
   for (const auto &[card_name, _] : suit_it->second) {
     if (card_name == name + "[0]") return true;
   }

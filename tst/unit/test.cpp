@@ -1121,3 +1121,29 @@ TEST_CASE("Deck - Include Statement") {
     fs::remove_all(tmp);
   }
 }
+TEST_CASE("Deck - Vector slice with element-wise math") {
+  GIVEN("A Rummy stream that defines a 3-element vector, then cubes a 2-element "
+        "sub-slice") {
+    Rummy::SimpleDeck deck;
+    // base[:3] defines [2.0, 3.0, 4.0].
+    // cubed[:2] = base[:2] ** 3 takes only the first two elements and cubes them.
+    std::istringstream ss("<block>\n"
+                          "base[:3] = [2.0, 3.0, 4.0]\n"
+                          "cubed[:2] = base[:2] ** 3\n");
+    deck.Build(ss);
+
+    THEN("Base vector retains all three elements") {
+      auto b = deck.GetVector<double>("block", "base");
+      REQUIRE(b.size() == 3);
+      REQUIRE(b[0] == 2.0);
+      REQUIRE(b[1] == 3.0);
+      REQUIRE(b[2] == 4.0);
+    }
+    THEN("Cubed slice contains only the first two elements, each cubed") {
+      auto c = deck.GetVector<double>("block", "cubed");
+      REQUIRE(c.size() == 2);
+      FLOAT_REQUIRE(c[0], 8.0);  // 2^3
+      FLOAT_REQUIRE(c[1], 27.0); // 3^3
+    }
+  }
+}

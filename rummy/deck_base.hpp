@@ -110,6 +110,28 @@ class Card {
       }
     } else if (value.type == pips::ValueType::BOOL) {
       return value.as.boolean ? "true" : "false";
+    } else if (value.type == pips::ValueType::VECTOR && value.as.vector) {
+      std::string result = "[";
+      for (size_t i = 0; i < value.as.vector->elements.size(); ++i) {
+        if (i > 0) result += ", ";
+        const pips::Value &elem = value.as.vector->elements[i];
+        if (elem.type == pips::ValueType::NUMBER) {
+          if (static_cast<int>(elem.as.number) == elem.as.number) {
+            result += std::to_string(static_cast<int>(elem.as.number));
+          } else {
+            std::ostringstream oss;
+            oss << std::scientific << std::setprecision(precision)
+                << elem.as.number;
+            result += oss.str();
+          }
+        } else if (elem.type == pips::ValueType::BOOL) {
+          result += elem.as.boolean ? "true" : "false";
+        } else if (elem.type == pips::ValueType::STRING && elem.as.string) {
+          result += "\"" + elem.as.string->str + "\"";
+        }
+      }
+      result += "]";
+      return result;
     }
     fatal("Value type is not supported for GetString()");
     return "";
@@ -285,6 +307,30 @@ class DeckBase {
   template <typename T>
   std::vector<T> GetVector(const std::string &suit, const std::string &name,
                            std::vector<std::string> &comments) const {
+    // Check for a native vector card stored as a single entry.
+    auto suit_it = deck.find(suit);
+    if (suit_it != deck.end()) {
+      auto card_it = suit_it->second.find(name);
+      if (card_it != suit_it->second.end()) {
+        const pips::Value &val = card_it->second.GetValue();
+        if (val.type == pips::ValueType::VECTOR && val.as.vector) {
+          std::vector<T> vec;
+          const std::string &card_comment = card_it->second.GetComment();
+          vec.reserve(val.as.vector->elements.size());
+          for (const auto &elem : val.as.vector->elements) {
+            Card tmp("", name, elem, "");
+            if constexpr (std::is_same_v<T, std::string>) {
+              vec.push_back(tmp.GetString());
+            } else {
+              vec.push_back(tmp.Get<T>());
+            }
+            comments.push_back(card_comment);
+          }
+          return vec;
+        }
+      }
+    }
+    // Fall back to per-element cards (name[0], name[1], ...).
     std::string vname = name + "[";
     auto cards = FindCardFuzzy(suit, vname);
     std::sort(cards.begin(), cards.end(), [](const Card &a, const Card &b) {
