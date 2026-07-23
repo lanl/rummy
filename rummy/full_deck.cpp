@@ -622,10 +622,9 @@ bool ExprMentions(const std::string &expr, const std::string &ident) {
 
 // Classify a single block.  Globals block always uses Pips emission style
 // (we always emit line-by-line), but per-line is treated declaratively where
-// possible.  In Strict mode, blocks with same-block self-references are kept
-// in Declarative mode (the emission path translates the bare refs to
-// `lvar.field`); in Loose mode they are demoted to Pips.
-void ClassifyBlock(Block &b, FullDeck::Mode mode) {
+// possible. Blocks with same-block references remain declarative so the
+// emission path can translate bare references to `lvar.field`.
+void ClassifyBlock(Block &b, FullDeck::Mode /*mode*/) {
   if (b.header.suit_path.empty()) {
     // Globals — we always go line-by-line; mode field unused
     b.mode = BlockMode::Pips;
@@ -652,20 +651,6 @@ void ClassifyBlock(Block &b, FullDeck::Mode mode) {
       b.mode = BlockMode::Pips; return;
     }
     lhs_bases.insert(li.base);
-  }
-  // Self-reference detection: in Loose mode, demote to Pips.  In Strict mode
-  // keep Declarative — the emission path will rewrite bare same-block-LHS
-  // refs to `lvar.field`.
-  if (mode == FullDeck::Mode::Loose) {
-    for (const auto &dl : b.lines) {
-      const std::string &raw = dl.raw;
-      auto eq = FindAssign(raw);
-      if (eq == std::string::npos) continue;
-      std::string rhs = raw.substr(eq + 1);
-      for (const auto &base : lhs_bases) {
-        if (ExprMentions(rhs, base)) { b.mode = BlockMode::Pips; return; }
-      }
-    }
   }
   b.mode = BlockMode::Declarative;
 }
@@ -1399,14 +1384,12 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
           (mode_ == Mode::Strict && all_simple_scalar && !has_self_ref
            && !has_prior_cards);
 
-      // Translate an RHS expression.  In Strict mode with self-refs, bare
-      // identifiers that match a same-block LHS base are rewritten to
-      // `lvar.field` so they resolve against the current instance.  Loose
-      // mode (and Strict mode without self-refs) keeps the legacy behaviour
-      // where same-block-LHS bare refs are left literal.
+      // Translate an RHS expression. With self-references, bare identifiers
+      // that match a same-block LHS base are rewritten to `lvar.field` so
+      // they resolve against the current instance.
       std::set<std::string> tr_skip = same_block_lhs;
       std::map<std::string, std::string> rewrite_self;
-      if (mode_ == Mode::Strict && has_self_ref) {
+      if (has_self_ref) {
         for (const auto &b : same_block_lhs) rewrite_self[b] = lvar + "." + b;
       }
       auto tr = [&](const std::string &e) {

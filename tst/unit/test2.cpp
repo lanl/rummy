@@ -335,6 +335,23 @@ TEST_CASE("Deck2 - Fixture: declarative_block.par") {
   FLOAT_REQUIRE(d.GetCardValue<double>("myblock", "derived"), 99.0);
 }
 
+TEST_CASE("Deck2 - Loose declarative block resolves same-block references") {
+  Rummy::FullDeck d(Rummy::FullDeck::Mode::Loose);
+  std::stringstream ss;
+  ss << "<parthenon/mesh>\n"
+     << "ix1_bc = \"ic\"\n"
+     << "ox1_bc = ix1_bc\n"
+     << "ix2_bc = \"periodic\"\n"
+     << "ox2_bc = ix2_bc\n";
+
+  d.Build(ss);
+
+  REQUIRE(d.GetCardValue<std::string>("parthenon/mesh", "ix1_bc") == "ic");
+  REQUIRE(d.GetCardValue<std::string>("parthenon/mesh", "ox1_bc") == "ic");
+  REQUIRE(d.GetCardValue<std::string>("parthenon/mesh", "ix2_bc") == "periodic");
+  REQUIRE(d.GetCardValue<std::string>("parthenon/mesh", "ox2_bc") == "periodic");
+}
+
 TEST_CASE("Deck2 - Fixture: declarative_vectors.par") {
   Rummy::FullDeck d;
   d.Build(fixture("declarative_vectors.par"));
