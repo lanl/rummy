@@ -37,6 +37,15 @@
 
 namespace Rummy {
 
+// A named deck source. Supplying the base directory separately lets callers
+// compose a program from several files without changing the meaning of
+// relative include directives in each file.
+struct InputSource {
+  std::string name;
+  std::string contents;
+  std::string base_dir;
+};
+
 // ---------------------------------------------------------------------------
 // Card: a single named, typed value with an optional comment and source loc.
 // ---------------------------------------------------------------------------
@@ -228,6 +237,7 @@ class DeckBase {
   virtual void Build(std::istream &ss) = 0;
   virtual void Build(std::istream &ss, std::string prepends) = 0;
   virtual void Build(std::istream &ss, std::istream &prepends) = 0;
+  virtual void BuildSources(const std::vector<InputSource> &sources) = 0;
 
   // ---- Accessors -------------------------------------------------------
   const std::map<std::string, Card> &GetSuit(const std::string &suit) const {

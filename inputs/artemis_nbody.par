@@ -102,6 +102,8 @@ alpha = alpha
 <gravity/nbody>
 integrator = "none"
 
+<nbody>
+
 <./particle(star)>
 mass = 1.0
 couple = 1
@@ -134,3 +136,4 @@ h0 = h
 polytropic_index = 1
 
 finalize()
+

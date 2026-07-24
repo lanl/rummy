@@ -302,6 +302,13 @@ void SimpleDeck::Build(std::istream &ss, std::istream &prepends) {
   Build(ss);
 }
 
+void SimpleDeck::BuildSources(const std::vector<InputSource> &sources) {
+  for (const auto &source : sources) {
+    std::istringstream stream(source.contents);
+    BuildInternal(stream, source.base_dir);
+  }
+}
+
 void SimpleDeck::CompileStream(std::istream &ss, std::map<std::string, CardMeta> &meta,
                          const std::string &base_dir,
                          std::set<std::string> &include_stack, pips::VTable &locals,

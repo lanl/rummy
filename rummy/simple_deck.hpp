@@ -46,6 +46,7 @@ class SimpleDeck : public DeckBase {
   void Build(std::istream &ss) override;
   void Build(std::istream &ss, std::string prepends) override;
   void Build(std::istream &ss, std::istream &prepends) override;
+  void BuildSources(const std::vector<InputSource> &sources) override;
   void CompileInput(std::istream &ss, std::map<std::string, CardMeta> &meta,
                     const std::string &base_dir = "");
 

@@ -35,7 +35,6 @@
 #include <iostream>
 #include <map>
 #include <memory>
-#include <unordered_map>
 #include <optional>
 #include <set>
 #include <sstream>
@@ -58,12 +57,11 @@ namespace {
 // Suit / class name mangling
 // --------------------------------------------------------------------------
 const std::set<std::string> kPipsReserved = {
-    "and",   "class",  "else",  "false", "for",    "fn",   "if",      "nil",
-    "not",   "new",    "or",    "print", "return", "super", "this",   "true",
-    "var",   "while",  "getattr", "setattr",
-    "pi",    "min",    "max",   "exp",   "sin",    "cos",  "tan",    "abs",
-    "log",   "log10",  "sign",  "sqrt",  "acos",   "asin", "atan",   "atan2",
-    "ceil",  "floor",  "env",   "str"};
+    "and",  "class", "else",    "false",   "for",    "fn",    "if",   "nil",
+    "not",  "new",   "or",      "print",   "return", "super", "this", "true",
+    "var",  "while", "getattr", "setattr", "pi",     "min",   "max",  "exp",
+    "sin",  "cos",   "tan",     "abs",     "log",    "log10", "sign", "sqrt",
+    "acos", "asin",  "atan",    "atan2",   "ceil",   "floor", "env",  "str"};
 
 bool NeedsVmSuitAlias(const std::string &segment) {
   if (segment.empty() || kPipsReserved.count(segment) > 0) return true;
@@ -81,8 +79,10 @@ std::string VmSuitSegment(const std::string &segment) {
   // it valid pips while staying readable in generated output.
   std::string aliased = "_";
   for (char c : segment) {
-    if (std::isalnum(static_cast<unsigned char>(c)) || c == '_') aliased += c;
-    else aliased += '_';
+    if (std::isalnum(static_cast<unsigned char>(c)) || c == '_')
+      aliased += c;
+    else
+      aliased += '_';
   }
   return aliased;
 }
@@ -109,8 +109,10 @@ std::string ExternalSuitDotPath(const std::string &suit_path) {
 std::string SuitClassName(const std::string &suit_path) {
   std::string cn;
   for (char c : suit_path) {
-    if (std::isalnum(static_cast<unsigned char>(c))) cn += c;
-    else cn += '_';
+    if (std::isalnum(static_cast<unsigned char>(c)))
+      cn += c;
+    else
+      cn += '_';
   }
   return cn;
 }
@@ -129,9 +131,12 @@ int CountBraceDepth(const std::string &s) {
   int d = 0;
   bool in_quotes = false;
   for (char c : s) {
-    if (c == '"') in_quotes = !in_quotes;
-    else if (!in_quotes && c == '{') ++d;
-    else if (!in_quotes && c == '}') --d;
+    if (c == '"')
+      in_quotes = !in_quotes;
+    else if (!in_quotes && c == '{')
+      ++d;
+    else if (!in_quotes && c == '}')
+      --d;
   }
   return d;
 }
@@ -146,11 +151,11 @@ struct DeckLine {
 };
 
 struct BlockHeader {
-  std::string suit_path;       // "" for the implicit globals block. For
-                               // non-globals this is the EFFECTIVE path:
-                               // each segment's alias (or the node name if
-                               // no alias) joined by '/'.
-  std::string instance_name;   // last-segment alias; empty if none
+  std::string suit_path;     // "" for the implicit globals block. For
+                             // non-globals this is the EFFECTIVE path:
+                             // each segment's alias (or the node name if
+                             // no alias) joined by '/'.
+  std::string instance_name; // last-segment alias; empty if none
   // Per-segment original node names (one entry per '/'-separated segment).
   // Used to derive class names: Capitalize(node_names[i]) is the class for
   // the i-th segment.  Empty for the globals block.
@@ -170,9 +175,8 @@ struct DeckIR {
   std::vector<Block> blocks; // blocks[0] is always the globals block ("")
   void print() {
     for (const auto &b : blocks) {
-      std::cout << "Block: suit_path='" << b.header.suit_path
-                << "' instance_name='" << b.header.instance_name
-                << "' loc=" << b.header.loc
+      std::cout << "Block: suit_path='" << b.header.suit_path << "' instance_name='"
+                << b.header.instance_name << "' loc=" << b.header.loc
                 << " mode=" << (b.mode == BlockMode::Declarative ? "Declarative" : "Pips")
                 << std::endl;
       for (const auto &l : b.lines) {
@@ -232,8 +236,12 @@ class IrParser {
         bool in_quotes = false;
         size_t cpos = std::string::npos;
         for (size_t i = 0; i < line.size(); ++i) {
-          if (line[i] == '"') in_quotes = !in_quotes;
-          else if (line[i] == '#' && !in_quotes) { cpos = i; break; }
+          if (line[i] == '"')
+            in_quotes = !in_quotes;
+          else if (line[i] == '#' && !in_quotes) {
+            cpos = i;
+            break;
+          }
         }
         if (cpos != std::string::npos) {
           this_comment = line.substr(cpos + 1);
@@ -259,7 +267,9 @@ class IrParser {
         if (brace_depth <= 0) {
           DeckLine dl{brace_start_loc, brace_buf, brace_comment};
           ir.blocks[current_block_].lines.push_back(std::move(dl));
-          brace_buf.clear(); brace_comment.clear(); brace_depth = 0;
+          brace_buf.clear();
+          brace_comment.clear();
+          brace_depth = 0;
         }
         continue;
       }
@@ -276,7 +286,9 @@ class IrParser {
         if (has_amp) continue;
         body = cont_buf;
         this_comment = cont_comment;
-        cont_buf.clear(); cont_comment.clear(); in_continuation = false;
+        cont_buf.clear();
+        cont_comment.clear();
+        in_continuation = false;
         // recompute first/last
         first = body.find_first_not_of(' ');
         if (first == std::string::npos) continue;
@@ -367,16 +379,15 @@ class IrParser {
             // Count leading "../" sequences to determine how many levels to go up.
             int levels = 0;
             size_t pos = 0;
-            while (pos + 2 < header.size() &&
-                   header[pos] == '.' && header[pos + 1] == '.' &&
-                   header[pos + 2] == '/') {
+            while (pos + 2 < header.size() && header[pos] == '.' &&
+                   header[pos + 1] == '.' && header[pos + 2] == '/') {
               ++levels;
               pos += 3;
             }
             if (levels == 0) {
               std::stringstream m;
-              m << "Malformed relative suit header '" << header
-                << "' at line " << line_num;
+              m << "Malformed relative suit header '" << header << "' at line "
+                << line_num;
               fatal(m);
             }
             // Strip `levels` trailing segments from prev_suit_.
@@ -415,8 +426,7 @@ class IrParser {
               auto pclose = seg.find(')', popen);
               if (pclose == std::string::npos) {
                 std::stringstream m;
-                m << "Missing ')' in suit segment '" << seg
-                  << "' at line " << line_num;
+                m << "Missing ')' in suit segment '" << seg << "' at line " << line_num;
                 fatal(m);
               }
               alias = seg.substr(popen + 1, pclose - popen - 1);
@@ -497,11 +507,16 @@ class IrParser {
 size_t FindAssign(const std::string &s) {
   bool in_quotes = false;
   for (size_t i = 0; i < s.size(); ++i) {
-    if (s[i] == '"') in_quotes = !in_quotes;
+    if (s[i] == '"')
+      in_quotes = !in_quotes;
     else if (!in_quotes && s[i] == '=') {
-      if (i + 1 < s.size() && s[i + 1] == '=') { ++i; continue; }
-      if (i > 0 && (s[i - 1] == '!' || s[i - 1] == '<' || s[i - 1] == '>' ||
-                    s[i - 1] == '=')) continue;
+      if (i + 1 < s.size() && s[i + 1] == '=') {
+        ++i;
+        continue;
+      }
+      if (i > 0 &&
+          (s[i - 1] == '!' || s[i - 1] == '<' || s[i - 1] == '>' || s[i - 1] == '='))
+        continue;
       return i;
     }
   }
@@ -509,10 +524,11 @@ size_t FindAssign(const std::string &s) {
 }
 
 bool StartsWithPipsKeyword(const std::string &s) {
-  static const std::set<std::string> kw = {"for", "while", "if",     "fn",
+  static const std::set<std::string> kw = {"for",   "while",  "if", "fn",
                                            "class", "return", "var"};
   size_t i = 0;
-  while (i < s.size() && std::isalpha(static_cast<unsigned char>(s[i]))) ++i;
+  while (i < s.size() && std::isalpha(static_cast<unsigned char>(s[i])))
+    ++i;
   return kw.count(s.substr(0, i)) > 0;
 }
 
@@ -551,17 +567,24 @@ LhsInfo AnalyseLhs(const std::string &lhs, int loc) {
 // Index/slice expressions like `n[0]` or `n[:3]` are NOT vector literals.
 bool RhsIsVector(const std::string &rhs) {
   std::string s = rhs;
-  RemoveLeadingWhitespace(s); RemoveTrailingWhitespace(s);
+  RemoveLeadingWhitespace(s);
+  RemoveTrailingWhitespace(s);
   if (!s.empty() && s.front() == '[') return true;
   bool in_quotes = false;
   int pd = 0, bd = 0;
   for (char c : s) {
-    if (c == '"') in_quotes = !in_quotes;
-    else if (!in_quotes && c == '(') ++pd;
-    else if (!in_quotes && c == ')') --pd;
-    else if (!in_quotes && c == '[') ++bd;
-    else if (!in_quotes && c == ']') --bd;
-    else if (!in_quotes && pd == 0 && bd == 0 && c == ',') return true;
+    if (c == '"')
+      in_quotes = !in_quotes;
+    else if (!in_quotes && c == '(')
+      ++pd;
+    else if (!in_quotes && c == ')')
+      --pd;
+    else if (!in_quotes && c == '[')
+      ++bd;
+    else if (!in_quotes && c == ']')
+      --bd;
+    else if (!in_quotes && pd == 0 && bd == 0 && c == ',')
+      return true;
   }
   return false;
 }
@@ -569,7 +592,8 @@ bool RhsIsVector(const std::string &rhs) {
 // Split a bracketed list expression "[a, b, c]" or "a, b, c" into elements.
 std::vector<std::string> SplitVectorRhs(const std::string &rhs_in, int loc) {
   std::string rhs = rhs_in;
-  RemoveLeadingWhitespace(rhs); RemoveTrailingWhitespace(rhs);
+  RemoveLeadingWhitespace(rhs);
+  RemoveTrailingWhitespace(rhs);
   if (!rhs.empty() && rhs.front() == '[') {
     auto cb = rhs.find_last_of(']');
     if (cb == std::string::npos) {
@@ -584,15 +608,25 @@ std::vector<std::string> SplitVectorRhs(const std::string &rhs_in, int loc) {
   bool in_quotes = false;
   int pd = 0;
   for (char c : rhs) {
-    if (c == '"') { in_quotes = !in_quotes; cur += c; }
-    else if (!in_quotes && c == '(') { ++pd; cur += c; }
-    else if (!in_quotes && c == ')') { --pd; cur += c; }
-    else if (!in_quotes && pd == 0 && c == ',') {
-      RemoveLeadingWhitespace(cur); RemoveTrailingWhitespace(cur);
-      out.push_back(cur); cur.clear();
-    } else cur += c;
+    if (c == '"') {
+      in_quotes = !in_quotes;
+      cur += c;
+    } else if (!in_quotes && c == '(') {
+      ++pd;
+      cur += c;
+    } else if (!in_quotes && c == ')') {
+      --pd;
+      cur += c;
+    } else if (!in_quotes && pd == 0 && c == ',') {
+      RemoveLeadingWhitespace(cur);
+      RemoveTrailingWhitespace(cur);
+      out.push_back(cur);
+      cur.clear();
+    } else
+      cur += c;
   }
-  RemoveLeadingWhitespace(cur); RemoveTrailingWhitespace(cur);
+  RemoveLeadingWhitespace(cur);
+  RemoveTrailingWhitespace(cur);
   if (!cur.empty()) out.push_back(cur);
   return out;
 }
@@ -603,7 +637,11 @@ bool ExprMentions(const std::string &expr, const std::string &ident) {
   size_t i = 0;
   while (i < expr.size()) {
     char c = expr[i];
-    if (c == '"') { in_quotes = !in_quotes; ++i; continue; }
+    if (c == '"') {
+      in_quotes = !in_quotes;
+      ++i;
+      continue;
+    }
     if (!in_quotes && (std::isalpha(static_cast<unsigned char>(c)) || c == '_')) {
       size_t j = i + 1;
       while (j < expr.size() &&
@@ -615,7 +653,8 @@ bool ExprMentions(const std::string &expr, const std::string &ident) {
       bool dot_after = (j < expr.size() && expr[j] == '.');
       if (tok == ident && !dot_before && !dot_after) return true;
       i = j;
-    } else ++i;
+    } else
+      ++i;
   }
   return false;
 }
@@ -633,7 +672,10 @@ void ClassifyBlock(Block &b, FullDeck::Mode /*mode*/) {
   std::set<std::string> lhs_bases;
   for (const auto &dl : b.lines) {
     const std::string &raw = dl.raw;
-    if (StartsWithPipsKeyword(raw)) { b.mode = BlockMode::Pips; return; }
+    if (StartsWithPipsKeyword(raw)) {
+      b.mode = BlockMode::Pips;
+      return;
+    }
     auto eq = FindAssign(raw);
     if (eq == std::string::npos) {
       // Lines without an `=` (e.g. `finalize()`) are treated as expression
@@ -643,12 +685,17 @@ void ClassifyBlock(Block &b, FullDeck::Mode /*mode*/) {
       continue;
     }
     std::string lhs = raw.substr(0, eq);
-    RemoveTrailingWhitespace(lhs); RemoveLeadingWhitespace(lhs);
-    if (lhs.find('.') != std::string::npos) { b.mode = BlockMode::Pips; return; }
+    RemoveTrailingWhitespace(lhs);
+    RemoveLeadingWhitespace(lhs);
+    if (lhs.find('.') != std::string::npos) {
+      b.mode = BlockMode::Pips;
+      return;
+    }
     LhsInfo li = AnalyseLhs(lhs, dl.loc);
     // No duplicate scalar LHS allowed in declarative mode
     if (li.kind == 0 && lhs_bases.count(li.base)) {
-      b.mode = BlockMode::Pips; return;
+      b.mode = BlockMode::Pips;
+      return;
     }
     lhs_bases.insert(li.base);
   }
@@ -661,6 +708,16 @@ void ClassifyBlock(Block &b, FullDeck::Mode /*mode*/) {
 // the VM object path "<vm_alpha>.<vm_sub>.f".  Bare identifiers are NOT
 // rewritten.
 // --------------------------------------------------------------------------
+bool IsScientificExponentMarker(const std::string &expr, size_t pos) {
+  if (pos == 0 || (expr[pos] != 'e' && expr[pos] != 'E')) return false;
+  const char previous = expr[pos - 1];
+  if (!(std::isdigit(static_cast<unsigned char>(previous)) || previous == '.'))
+    return false;
+  if (pos + 1 >= expr.size()) return false;
+  const char next = expr[pos + 1];
+  return std::isdigit(static_cast<unsigned char>(next)) || next == '+' || next == '-';
+}
+
 std::string TranslateExpr(const std::string &expr,
                           const std::set<std::string> &suit_paths,
                           const std::map<std::string, std::string> &suit_to_vm_name) {
@@ -684,15 +741,22 @@ std::string TranslateExpr(const std::string &expr,
   size_t i = 0;
   while (i < expr.size()) {
     char c = expr[i];
-    if (c == '"') { in_quotes = !in_quotes; translated += c; ++i; continue; }
-    if (!in_quotes && (std::isalpha(static_cast<unsigned char>(c)) || c == '_')) {
+    if (c == '"') {
+      in_quotes = !in_quotes;
+      translated += c;
+      ++i;
+      continue;
+    }
+    if (!in_quotes && !IsScientificExponentMarker(expr, i) &&
+        (std::isalpha(static_cast<unsigned char>(c)) || c == '_')) {
       size_t j = i + 1;
       while (j < expr.size()) {
         char tc = expr[j];
         if (std::isalnum(static_cast<unsigned char>(tc)) || tc == '_' || tc == '.' ||
             tc == '[' || tc == ']' || tc == ':')
           ++j;
-        else break;
+        else
+          break;
       }
       std::string tok = expr.substr(i, j - i);
       std::string best_suit;
@@ -711,7 +775,10 @@ std::string TranslateExpr(const std::string &expr,
       }
       translated += replacement;
       i = j;
-    } else { translated += c; ++i; }
+    } else {
+      translated += c;
+      ++i;
+    }
   }
   return translated;
 }
@@ -723,28 +790,50 @@ std::string TranslateExpr(const std::string &expr,
 // ============================================================================
 
 void FullDeck::Build(std::string fname, std::string prepends) {
-  std::stringstream pss; pss << prepends; Build(pss);
   std::ifstream input(fname);
   if (!input.is_open()) {
-    std::stringstream m; m << "Could not open file '" << fname << "'";
+    std::stringstream m;
+    m << "Could not open file '" << fname << "'";
     fatal(m);
   }
-  std::string base_dir = std::filesystem::path(fname).parent_path().string();
-  std::stringstream ss; ss << input.rdbuf();
-  BuildInternal(ss, base_dir);
-  SaveGraph(std::cout);
+  std::stringstream ss;
+  ss << input.rdbuf();
+  std::vector<InputSource> sources;
+  if (!prepends.empty()) sources.push_back({"<prepend>", prepends, ""});
+  sources.push_back(
+      {fname, ss.str(), std::filesystem::path(fname).parent_path().string()});
+  BuildSources(sources);
 }
 
 void FullDeck::Build(std::istream &ss, std::string prepends) {
-  std::stringstream pss; pss << prepends; Build(pss); Build(ss);
+  std::stringstream contents;
+  contents << ss.rdbuf();
+  std::vector<InputSource> sources;
+  if (!prepends.empty()) sources.push_back({"<prepend>", prepends, ""});
+  sources.push_back({"<stream>", contents.str(), ""});
+  BuildSources(sources);
 }
-void FullDeck::Build(std::istream &ss, std::istream &prepends) { Build(prepends); Build(ss); }
-void FullDeck::Build(std::istream &ss) { BuildInternal(ss, ""); }
+void FullDeck::Build(std::istream &ss, std::istream &prepends) {
+  std::stringstream prepend_contents, contents;
+  prepend_contents << prepends.rdbuf();
+  contents << ss.rdbuf();
+  BuildSources(
+      {{"<prepend>", prepend_contents.str(), ""}, {"<stream>", contents.str(), ""}});
+}
+void FullDeck::Build(std::istream &ss) {
+  std::stringstream contents;
+  contents << ss.rdbuf();
+  BuildSources({{"<stream>", contents.str(), ""}});
+}
+
+void FullDeck::BuildSources(const std::vector<InputSource> &sources) {
+  BuildInternal(sources);
+}
 
 // ---------------------------------------------------------------------------
 // BuildInternal — parse, classify, emit ONE pips program, interpret, readback
 // ---------------------------------------------------------------------------
-void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
+void FullDeck::BuildInternal(const std::vector<InputSource> &sources) {
   // Prepend the ctor-provided class definitions on every Build so each IR
   // sees them as ordinary globals.  This makes Strict-mode validation and
   // Loose-mode `user_declared_classes` tracking work uniformly across
@@ -755,21 +844,19 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
          "Schema::FromFile(...)) or FullDeck(Mode::Strict, schema_path).";
     fatal(m);
   }
-  std::stringstream combined;
   std::string schema_class_defs;
-  if (schema_.has_value() && !schema_->Empty()) {
-    schema_class_defs = schema_->EmitClassDefs();
-    combined << schema_class_defs << "\n";
-  }
-  combined << ss.rdbuf();
-
-  std::string combined_str = combined.str();
   // 1) PARSE
   DeckIR ir;
   std::set<std::string> include_stack;
   IrParser parser;
-  parser.Parse(combined, base_dir, include_stack, ir);
-  ir.print();
+  if (schema_.has_value() && !schema_->Empty()) {
+    std::istringstream schema_stream(schema_->EmitClassDefs());
+    parser.Parse(schema_stream, "", include_stack, ir);
+  }
+  for (const auto &source : sources) {
+    std::istringstream source_stream(source.contents);
+    parser.Parse(source_stream, source.base_dir, include_stack, ir);
+  }
 
   // 1b) Detect user-declared classes (any `class X { ... }` appearing in
   //     any block).  Auto-generation skips these so the user's definition
@@ -786,7 +873,8 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
       if (in_class.empty()) {
         if (raw.compare(i, 6, "class ") != 0) return;
         size_t j = i + 6;
-        while (j < raw.size() && raw[j] == ' ') ++j;
+        while (j < raw.size() && raw[j] == ' ')
+          ++j;
         size_t k = j;
         while (k < raw.size() &&
                (std::isalnum(static_cast<unsigned char>(raw[k])) || raw[k] == '_'))
@@ -800,7 +888,8 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
       } else {
         if (raw.compare(i, 4, "var ") == 0) {
           size_t j = i + 4;
-          while (j < raw.size() && raw[j] == ' ') ++j;
+          while (j < raw.size() && raw[j] == ' ')
+            ++j;
           size_t k = j;
           while (k < raw.size() &&
                  (std::isalnum(static_cast<unsigned char>(raw[k])) || raw[k] == '_'))
@@ -817,9 +906,8 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
       size_t pos = 0;
       while (pos <= raw.size()) {
         size_t nl = raw.find('\n', pos);
-        std::string ln = raw.substr(pos, nl == std::string::npos
-                                            ? std::string::npos
-                                            : nl - pos);
+        std::string ln =
+            raw.substr(pos, nl == std::string::npos ? std::string::npos : nl - pos);
         process_line(ln);
         if (nl == std::string::npos) break;
         pos = nl + 1;
@@ -837,7 +925,8 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
   // case we must create the child via setattr (even in Strict mode) because
   // the parent class doesn't declare `alias` as a field, while still
   // validating that `node` IS a field of the parent.
-  std::map<std::string, std::string> suit_parent_field_; // aliased suit -> parent field name
+  std::map<std::string, std::string>
+      suit_parent_field_; // aliased suit -> parent field name
   for (const auto &blk : ir.blocks) {
     if (blk.header.suit_path.empty()) continue;
     const auto &eff_parts = SplitSuitPath(blk.header.suit_path);
@@ -859,8 +948,8 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
       if (schema_.has_value()) cls = schema_->ClassFor(canon);
       if (cls.empty()) cls = Capitalize(nodes[i]);
       suit_class_name_.emplace(acc, cls);
-      if (eff_parts[i] != nodes[i])
-        suit_parent_field_.emplace(acc, nodes[i]);
+      suit_canonical_path_.emplace(acc, canon);
+      if (eff_parts[i] != nodes[i]) suit_parent_field_.emplace(acc, nodes[i]);
     }
   }
 
@@ -881,8 +970,8 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
         size_t pos = 0;
         while (pos <= raw.size()) {
           size_t nl = raw.find('\n', pos);
-          std::string ln = raw.substr(
-              pos, nl == std::string::npos ? std::string::npos : nl - pos);
+          std::string ln =
+              raw.substr(pos, nl == std::string::npos ? std::string::npos : nl - pos);
           size_t i = ln.find_first_not_of(" \t");
           if (i == std::string::npos) {
             if (nl == std::string::npos) break;
@@ -904,8 +993,7 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
               if (k != std::string::npos) lhs.erase(0, k);
               size_t e = 0;
               while (e < lhs.size() &&
-                     (std::isalnum(static_cast<unsigned char>(lhs[e])) ||
-                      lhs[e] == '_'))
+                     (std::isalnum(static_cast<unsigned char>(lhs[e])) || lhs[e] == '_'))
                 ++e;
               if (e > 0) add_global(lhs.substr(0, e));
             }
@@ -944,7 +1032,8 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
   }
 
   // 3) CLASSIFY
-  for (auto &blk : ir.blocks) ClassifyBlock(blk, mode_);
+  for (auto &blk : ir.blocks)
+    ClassifyBlock(blk, mode_);
 
   // 4) SCHEMA — walk IR and collect fields per suit (scalar field names only;
   //    vector fields like v[0] are populated via setattr, not via class decl).
@@ -960,7 +1049,8 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
   // Existing cards seed the schema
   for (const auto &[suit, cards] : deck) {
     if (suit == "/") continue;
-    for (const auto &[name, _] : cards) add_field(suit, name);
+    for (const auto &[name, _] : cards)
+      add_field(suit, name);
   }
   // New IR fields
   for (const auto &blk : ir.blocks) {
@@ -970,7 +1060,8 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
       auto eq = FindAssign(dl.raw);
       if (eq == std::string::npos) continue;
       std::string lhs = dl.raw.substr(0, eq);
-      RemoveTrailingWhitespace(lhs); RemoveLeadingWhitespace(lhs);
+      RemoveTrailingWhitespace(lhs);
+      RemoveLeadingWhitespace(lhs);
       if (lhs.find('.') != std::string::npos) continue;
       LhsInfo li = AnalyseLhs(lhs, dl.loc);
       if (li.kind == 0) add_field(blk.header.suit_path, li.base);
@@ -1051,9 +1142,8 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
       auto fit = user_class_fields.find(pcls);
       if (fit == user_class_fields.end() || !fit->second.count(field)) {
         std::stringstream m;
-        m << "Strict mode: aliased suit '" << sp << "' implies field '"
-          << field << "' on class '" << pcls
-          << "', but no such field is declared.";
+        m << "Strict mode: aliased suit '" << sp << "' implies field '" << field
+          << "' on class '" << pcls << "', but no such field is declared.";
         fatal(m);
       }
     }
@@ -1132,8 +1222,14 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
     size_t i = 0;
     while (i < base.size()) {
       char c = base[i];
-      if (c == '"') { in_quotes = !in_quotes; out += c; ++i; continue; }
-      if (!in_quotes && (std::isalpha(static_cast<unsigned char>(c)) || c == '_')) {
+      if (c == '"') {
+        in_quotes = !in_quotes;
+        out += c;
+        ++i;
+        continue;
+      }
+      if (!in_quotes && !IsScientificExponentMarker(base, i) &&
+          (std::isalpha(static_cast<unsigned char>(c)) || c == '_')) {
         size_t j = i + 1;
         while (j < base.size() &&
                (std::isalnum(static_cast<unsigned char>(base[j])) || base[j] == '_'))
@@ -1141,16 +1237,17 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
         std::string tok = base.substr(i, j - i);
         bool prev_dot = (i > 0 && base[i - 1] == '.');
         char next_c = (j < base.size()) ? base[j] : '\0';
-        bool followed_by_member_or_call =
-            (next_c == '.' || next_c == '(');
-        if (!prev_dot && !followed_by_member_or_call &&
-            !same_block_lhs.count(tok)) {
+        bool followed_by_member_or_call = (next_c == '.' || next_c == '(');
+        if (!prev_dot && !followed_by_member_or_call && !same_block_lhs.count(tok)) {
           auto it = bare_to_qualified.find(tok);
           if (it != bare_to_qualified.end()) tok = it->second;
         }
         out += tok;
         i = j;
-      } else { out += c; ++i; }
+      } else {
+        out += c;
+        ++i;
+      }
     }
     return out;
   };
@@ -1163,8 +1260,7 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
     } else if (v.type == pips::ValueType::BOOL) {
       os << (v.as.boolean ? "true" : "false");
     } else if (v.type == pips::ValueType::NUMBER) {
-      os << std::setprecision(std::numeric_limits<double>::max_digits10)
-         << v.as.number;
+      os << std::setprecision(std::numeric_limits<double>::max_digits10) << v.as.number;
     } else if (v.type == pips::ValueType::NIL) {
       os << "nil";
     } else if (v.type == pips::ValueType::VECTOR) {
@@ -1214,53 +1310,51 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
   // immediately after the `new` line so their values are in place before
   // any subsequent block-body setattrs.
   std::set<std::string> instantiated;
-  std::function<void(const std::string &)> emit_instance =
-      [&](const std::string &sp) {
-        auto parts = SplitSuitPath(sp);
-        std::string acc;
-        for (size_t i = 0; i < parts.size(); ++i) {
-          if (i) acc += "/";
-          acc += parts[i];
-          if (!instantiated.insert(acc).second) continue;
-          const std::string lvar = suit_local_var(acc);
-          if (i == 0) {
-            prog << "var " << lvar << " = new "
-                 << class_name_for_suit(acc) << " {}\n";
+  std::function<void(const std::string &)> emit_instance = [&](const std::string &sp) {
+    auto parts = SplitSuitPath(sp);
+    std::string acc;
+    for (size_t i = 0; i < parts.size(); ++i) {
+      if (i) acc += "/";
+      acc += parts[i];
+      if (!instantiated.insert(acc).second) continue;
+      const std::string lvar = suit_local_var(acc);
+      if (i == 0) {
+        prog << "var " << lvar << " = new " << class_name_for_suit(acc) << " {}\n";
+      } else {
+        std::string parent;
+        for (size_t j = 0; j < i; ++j) {
+          if (j) parent += ".";
+          parent += parts[j];
+        }
+        // Aliased child instances
+        // attach the instance via setattr regardless of mode — the
+        // parent class declares the underlying node name as a field,
+        // not the alias, so a direct SET_PROPERTY would fail strict
+        // checks.
+        bool aliased = suit_parent_field_.count(acc) > 0;
+        if (mode_ == Mode::Strict && !aliased) {
+          prog << parent << "." << parts[i] << " = new " << class_name_for_suit(acc)
+               << " {}\n";
+        } else {
+          prog << "setattr(" << parent << ", \"" << parts[i] << "\", new "
+               << class_name_for_suit(acc) << " {})\n";
+        }
+      }
+      // Seed any prior-build deck cards for this suit.
+      auto dit = deck.find(acc);
+      if (dit != deck.end()) {
+        for (const auto &[name, card] : dit->second) {
+          if (mode_ == Mode::Strict) {
+            prog << lvar << "." << name << " = " << value_to_literal(card.GetValue())
+                 << "\n";
           } else {
-            std::string parent;
-            for (size_t j = 0; j < i; ++j) {
-              if (j) parent += ".";
-              parent += parts[j];
-            }
-            // Aliased child instances (e.g. `<parthenon/output(out1)>`)
-            // attach the instance via setattr regardless of mode — the
-            // parent class declares the underlying node name as a field,
-            // not the alias, so a direct SET_PROPERTY would fail strict
-            // checks.
-            bool aliased = suit_parent_field_.count(acc) > 0;
-            if (mode_ == Mode::Strict && !aliased) {
-              prog << parent << "." << parts[i] << " = new "
-                   << class_name_for_suit(acc) << " {}\n";
-            } else {
-              prog << "setattr(" << parent << ", \"" << parts[i]
-                   << "\", new " << class_name_for_suit(acc) << " {})\n";
-            }
-          }
-          // Seed any prior-build deck cards for this suit.
-          auto dit = deck.find(acc);
-          if (dit != deck.end()) {
-            for (const auto &[name, card] : dit->second) {
-              if (mode_ == Mode::Strict) {
-                prog << lvar << "." << name << " = "
-                     << value_to_literal(card.GetValue()) << "\n";
-              } else {
-                prog << "setattr(" << lvar << ", \"" << name << "\", "
-                     << value_to_literal(card.GetValue()) << ")\n";
-              }
-            }
+            prog << "setattr(" << lvar << ", \"" << name << "\", "
+                 << value_to_literal(card.GetValue()) << ")\n";
           }
         }
-      };
+      }
+    }
+  };
 
   // 5c) Emit per-block lowering.
   //     Globals block (header.suit_path == "") emits raw / `var name = expr`.
@@ -1269,7 +1363,8 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
   std::map<int, int> prog_line_to_loc; // 1-based prog line -> source loc
   auto emit_line = [&](const std::string &line_text, int src_loc) {
     int prog_line = 1;
-    for (char c : prog.str()) if (c == '\n') ++prog_line;
+    for (char c : prog.str())
+      if (c == '\n') ++prog_line;
     prog_line_to_loc[prog_line] = src_loc;
     prog << line_text << "\n";
   };
@@ -1285,8 +1380,7 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
         {
           const std::string &r = dl.raw;
           size_t i = r.find_first_not_of(' ');
-          if (i != std::string::npos && r.compare(i, 6, "class ") == 0)
-            continue;
+          if (i != std::string::npos && r.compare(i, 6, "class ") == 0) continue;
         }
         const std::string &raw = dl.raw;
         auto eq = FindAssign(raw);
@@ -1297,8 +1391,10 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
         }
         std::string lhs = raw.substr(0, eq);
         std::string rhs = raw.substr(eq + 1);
-        RemoveTrailingWhitespace(lhs); RemoveLeadingWhitespace(lhs);
-        RemoveLeadingWhitespace(rhs); RemoveTrailingWhitespace(rhs);
+        RemoveTrailingWhitespace(lhs);
+        RemoveLeadingWhitespace(lhs);
+        RemoveLeadingWhitespace(rhs);
+        RemoveTrailingWhitespace(rhs);
         // Dotted LHS (e.g. `suit.f = expr`) -> treat as cross-suit assignment
         if (lhs.find('.') != std::string::npos) {
           // translate LHS via suit translation too
@@ -1357,10 +1453,17 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
       bool has_self_ref = false;
       for (const auto &dl : blk.lines) {
         auto eq = FindAssign(dl.raw);
-        if (eq == std::string::npos) { all_simple_scalar = false; continue; }
+        if (eq == std::string::npos) {
+          all_simple_scalar = false;
+          continue;
+        }
         std::string lhs = dl.raw.substr(0, eq);
-        RemoveTrailingWhitespace(lhs); RemoveLeadingWhitespace(lhs);
-        if (lhs.find('.') != std::string::npos) { all_simple_scalar = false; continue; }
+        RemoveTrailingWhitespace(lhs);
+        RemoveLeadingWhitespace(lhs);
+        if (lhs.find('.') != std::string::npos) {
+          all_simple_scalar = false;
+          continue;
+        }
         LhsInfo li = AnalyseLhs(lhs, dl.loc);
         if (li.kind != 0) all_simple_scalar = false;
         if (!li.base.empty()) same_block_lhs.insert(li.base);
@@ -1373,16 +1476,18 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
         if (eq == std::string::npos) continue;
         std::string rhs = dl.raw.substr(eq + 1);
         for (const auto &base : same_block_lhs) {
-          if (ExprMentions(rhs, base)) { has_self_ref = true; break; }
+          if (ExprMentions(rhs, base)) {
+            has_self_ref = true;
+            break;
+          }
         }
         if (has_self_ref) break;
       }
       auto dit_prior = deck.find(sp);
       bool has_prior_cards = (dit_prior != deck.end() && !dit_prior->second.empty());
 
-      const bool use_initializer =
-          (mode_ == Mode::Strict && all_simple_scalar && !has_self_ref
-           && !has_prior_cards);
+      const bool use_initializer = (mode_ == Mode::Strict && all_simple_scalar &&
+                                    !has_self_ref && !has_prior_cards);
 
       // Translate an RHS expression. With self-references, bare identifiers
       // that match a same-block LHS base are rewritten to `lvar.field` so
@@ -1390,7 +1495,8 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
       std::set<std::string> tr_skip = same_block_lhs;
       std::map<std::string, std::string> rewrite_self;
       if (has_self_ref) {
-        for (const auto &b : same_block_lhs) rewrite_self[b] = lvar + "." + b;
+        for (const auto &b : same_block_lhs)
+          rewrite_self[b] = lvar + "." + b;
       }
       auto tr = [&](const std::string &e) {
         std::string out = translate_decl(e, tr_skip);
@@ -1401,8 +1507,14 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
         size_t i = 0;
         while (i < out.size()) {
           char c = out[i];
-          if (c == '"') { in_quotes = !in_quotes; res += c; ++i; continue; }
-          if (!in_quotes && (std::isalpha(static_cast<unsigned char>(c)) || c == '_')) {
+          if (c == '"') {
+            in_quotes = !in_quotes;
+            res += c;
+            ++i;
+            continue;
+          }
+          if (!in_quotes && !IsScientificExponentMarker(out, i) &&
+              (std::isalpha(static_cast<unsigned char>(c)) || c == '_')) {
             size_t j = i + 1;
             while (j < out.size() &&
                    (std::isalnum(static_cast<unsigned char>(out[j])) || out[j] == '_'))
@@ -1417,7 +1529,10 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
             }
             res += tok;
             i = j;
-          } else { res += c; ++i; }
+          } else {
+            res += c;
+            ++i;
+          }
         }
         return res;
       };
@@ -1464,8 +1579,10 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
           if (eq == std::string::npos) continue;
           std::string lhs = raw.substr(0, eq);
           std::string rhs = raw.substr(eq + 1);
-          RemoveTrailingWhitespace(lhs); RemoveLeadingWhitespace(lhs);
-          RemoveLeadingWhitespace(rhs); RemoveTrailingWhitespace(rhs);
+          RemoveTrailingWhitespace(lhs);
+          RemoveLeadingWhitespace(lhs);
+          RemoveLeadingWhitespace(rhs);
+          RemoveTrailingWhitespace(rhs);
           LhsInfo li = AnalyseLhs(lhs, dl.loc);
           std::string val;
           if (RhsIsVector(rhs)) {
@@ -1494,8 +1611,7 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
           if (mode_ == Mode::Strict)
             emit_line(lvar + "." + field + " = " + val, loc);
           else
-            emit_line("setattr(" + lvar + ", \"" + field + "\", " + val + ")",
-                      loc);
+            emit_line("setattr(" + lvar + ", \"" + field + "\", " + val + ")", loc);
         };
         // Emit one assignment per field/vector slot.  (We already created the
         // instance during the seeding pass.)
@@ -1511,8 +1627,10 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
           }
           std::string lhs = raw.substr(0, eq);
           std::string rhs = raw.substr(eq + 1);
-          RemoveTrailingWhitespace(lhs); RemoveLeadingWhitespace(lhs);
-          RemoveLeadingWhitespace(rhs); RemoveTrailingWhitespace(rhs);
+          RemoveTrailingWhitespace(lhs);
+          RemoveLeadingWhitespace(lhs);
+          RemoveLeadingWhitespace(rhs);
+          RemoveTrailingWhitespace(rhs);
           LhsInfo li = AnalyseLhs(lhs, dl.loc);
           if (li.kind == 0 && !RhsIsVector(rhs)) {
             emit_assign(li.base, tr(rhs), dl.loc);
@@ -1526,8 +1644,7 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
             vec_lit += "]";
             emit_assign(li.base, vec_lit, dl.loc);
           } else if (li.kind == 1) {
-            emit_line("setattr(" + lvar + ", \"" + lhs + "\", " + tr(rhs) + ")",
-                      dl.loc);
+            emit_line("setattr(" + lvar + ", \"" + lhs + "\", " + tr(rhs) + ")", dl.loc);
           } else {
             std::vector<std::string> vals;
             if (RhsIsVector(rhs)) vals = SplitVectorRhs(rhs, dl.loc);
@@ -1535,8 +1652,8 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
             if (vals.empty()) {
               auto rvals = SplitString(rhs, dl.loc, names.size());
               for (size_t i = 0; i < names.size(); ++i)
-                emit_line("setattr(" + lvar + ", \"" + names[i] + "\", "
-                              + tr(rvals[i]) + ")",
+                emit_line("setattr(" + lvar + ", \"" + names[i] + "\", " + tr(rvals[i]) +
+                              ")",
                           dl.loc);
             } else {
               if (names.size() > vals.size()) {
@@ -1545,8 +1662,8 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
                 fatal(m);
               }
               for (size_t i = 0; i < names.size(); ++i)
-                emit_line("setattr(" + lvar + ", \"" + names[i] + "\", "
-                              + tr(vals[i]) + ")",
+                emit_line("setattr(" + lvar + ", \"" + names[i] + "\", " + tr(vals[i]) +
+                              ")",
                           dl.loc);
             }
           }
@@ -1566,11 +1683,10 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
   // Materialize any remaining suits that exist in the deck (from prior
   // incremental Build calls) but have no block in this IR.  These must be
   // instantiated so subsequent reads can find them.
-  for (const auto &sp : all_suits_sorted) emit_instance(sp);
+  for (const auto &sp : all_suits_sorted)
+    emit_instance(sp);
 
   // 6) COMPILE
-  // output the prog
-  std::cout << "--- generated pips program ---\n" << prog.str() << "--- end program ---\n";
   const std::string program = prog.str();
 
   pips::VTable locals;
@@ -1585,8 +1701,10 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
   //    First reset the cards we will repopulate (preserve "/" entries that
   //    came from prior Build calls only if the globals block didn't touch
   //    them).  Simpler: clear all suit contents and rebuild.
-  for (auto &[suit, cards] : deck) cards.clear();
-  for (auto &[suit, cm] : card_map) cm.clear();
+  for (auto &[suit, cards] : deck)
+    cards.clear();
+  for (auto &[suit, cm] : card_map)
+    cm.clear();
 
   // Map suit -> instance pointer using the names we used in the program.
   // For top-level suits the variable lives in vm.globals.  For child suits we
@@ -1595,8 +1713,7 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
     auto parts = SplitSuitPath(sp);
     if (parts.empty()) return nullptr;
     auto it = suit_to_vm_name_.find(parts[0]);
-    const std::string root =
-        (it != suit_to_vm_name_.end()) ? it->second : parts[0];
+    const std::string root = (it != suit_to_vm_name_.end()) ? it->second : parts[0];
     auto g = vm.globals.find(root);
     if (g == vm.globals.end() || g->second.type != pips::ValueType::INSTANCE)
       return nullptr;
@@ -1650,7 +1767,8 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
     if (cit != child_segments_set.end()) child_field_names = cit->second;
     // Build a snapshot of all fields on the instance.
     std::unordered_map<std::string, pips::Value> all_fields;
-    for (const auto &[fname, fval] : inst->fields) all_fields[fname] = fval;
+    for (const auto &[fname, fval] : inst->fields)
+      all_fields[fname] = fval;
 
     // First, emit fields in declared/source order so card_map preserves
     // the order found in the deck file.
@@ -1661,7 +1779,8 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
       if (fval.type == pips::ValueType::NIL) return;
       if (fval.type == pips::ValueType::INSTANCE) return; // child link
       auto bracket = fname.find('[');
-      std::string base = (bracket != std::string::npos) ? fname.substr(0, bracket) : fname;
+      std::string base =
+          (bracket != std::string::npos) ? fname.substr(0, bracket) : fname;
       std::string comment;
       auto cmt = field_comments.find({sp, base});
       if (cmt != field_comments.end()) comment = cmt->second;
@@ -1674,8 +1793,7 @@ void FullDeck::BuildInternal(std::istream &ss, const std::string &base_dir) {
         if (std::find(cm.begin(), cm.end(), base) == cm.end()) cm.push_back(base);
         for (size_t i = 0; i < vo->elements.size(); ++i) {
           std::string slot = base + "[" + std::to_string(i) + "]";
-          Card c(sp, slot, vo->elements[i],
-                 (i == 0 ? comment : std::string{}), -1);
+          Card c(sp, slot, vo->elements[i], (i == 0 ? comment : std::string{}), -1);
           deck[sp][slot] = c;
         }
         return;
@@ -1761,25 +1879,31 @@ void FullDeck::RebuildInstanceRegistry() {
       auto parts = SplitSuitPath(sp);
       if (parts.size() != 1) continue;
       auto it = suit_to_vm_name_.find(sp);
-      const std::string expected =
-          (it != suit_to_vm_name_.end()) ? it->second : parts[0];
-      if (gn == expected) { scan(gv.as.instance, sp); break; }
+      const std::string expected = (it != suit_to_vm_name_.end()) ? it->second : parts[0];
+      if (gn == expected) {
+        scan(gv.as.instance, sp);
+        break;
+      }
     }
   }
 }
 
-std::vector<Card> FullDeck::FindSuitInOrder(const std::string &suit, const bool fuzzy) const {
+std::vector<Card> FullDeck::FindSuitInOrder(const std::string &suit,
+                                            const bool fuzzy) const {
   std::vector<Card> sub;
-  if (fuzzy) sub = FindSuitFuzzy(suit);
+  if (fuzzy)
+    sub = FindSuitFuzzy(suit);
   else {
     auto it = deck.find(suit);
     if (it == deck.end()) {
       if (suit != "/") {
-        std::stringstream m; m << "Suit '" << suit << "' not found in the deck.";
+        std::stringstream m;
+        m << "Suit '" << suit << "' not found in the deck.";
         fatal(m);
       }
     } else {
-      for (const auto &[_, c] : it->second) sub.push_back(c);
+      for (const auto &[_, c] : it->second)
+        sub.push_back(c);
     }
   }
   // Order by card_map order
@@ -1816,10 +1940,9 @@ bool FullDeck::PackDeviceFunction(const std::string &name, std::string &error) {
   if (sit != device_modules_.end()) {
     device_modules_.erase(sit);
     device_entry_ids_.erase(name);
-    device_function_order_.erase(std::remove(device_function_order_.begin(),
-                                             device_function_order_.end(),
-                                             name),
-                                 device_function_order_.end());
+    device_function_order_.erase(
+        std::remove(device_function_order_.begin(), device_function_order_.end(), name),
+        device_function_order_.end());
   }
 
   pips::device::DeviceModuleStorage storage;
@@ -1840,7 +1963,8 @@ void FullDeck::PackDeviceFunction(const std::string &name) {
   }
 }
 
-FullDeck::DeviceFunctionHandle FullDeck::GetDeviceFunction(const std::string &name) const {
+FullDeck::DeviceFunctionHandle
+FullDeck::GetDeviceFunction(const std::string &name) const {
   auto sit = device_modules_.find(name);
   auto eit = device_entry_ids_.find(name);
   if (sit == device_modules_.end() || eit == device_entry_ids_.end()) {
@@ -1854,7 +1978,7 @@ FullDeck::DeviceFunctionHandle FullDeck::GetDeviceFunction(const std::string &na
 }
 
 double FullDeck::CallDeviceFunction(const std::string &name,
-                                 const std::vector<double> &args) const {
+                                    const std::vector<double> &args) const {
   DeviceFunctionHandle h = GetDeviceFunction(name);
   std::vector<pips::device::DeviceValue> dargs;
   dargs.reserve(args.size());
@@ -1862,17 +1986,15 @@ double FullDeck::CallDeviceFunction(const std::string &name,
     dargs.push_back(pips::device::dv_number(static_cast<pips::device::DeviceReal>(a)));
   pips::device::DeviceVM dvm;
   pips::device::DeviceValue result{};
-  pips::device::DeviceStatus st = dvm.run(
-      h.module, h.entry_id, dargs.empty() ? nullptr : dargs.data(),
-      static_cast<std::uint32_t>(dargs.size()), &result);
+  pips::device::DeviceStatus st =
+      dvm.run(h.module, h.entry_id, dargs.empty() ? nullptr : dargs.data(),
+              static_cast<std::uint32_t>(dargs.size()), &result);
   if (st != pips::device::DeviceStatus::OK) {
-    throw std::runtime_error("Device function '" + name +
-                             "' failed with device status " +
+    throw std::runtime_error("Device function '" + name + "' failed with device status " +
                              std::to_string(static_cast<int>(st)));
   }
   if (result.type != pips::device::DeviceValueType::NUMBER) {
-    throw std::runtime_error("Device function '" + name +
-                             "' did not return a number.");
+    throw std::runtime_error("Device function '" + name + "' did not return a number.");
   }
   return static_cast<double>(result.as.n);
 }
@@ -1896,8 +2018,18 @@ std::string FullDeck::GetClassName(const std::string &suit) const {
   return "";
 }
 
-std::vector<std::string>
-FullDeck::FindSuitsOfClass(const std::string &className) const {
+std::string FullDeck::GetCanonicalPath(const std::string &suit) const {
+  auto it = suit_canonical_path_.find(suit);
+  return it == suit_canonical_path_.end() ? suit : it->second;
+}
+
+void FullDeck::SeedSuitMetadata(const std::string &suit, const std::string &class_name,
+                                const std::string &canonical_path) {
+  if (!class_name.empty()) suit_class_name_[suit] = class_name;
+  if (!canonical_path.empty()) suit_canonical_path_[suit] = canonical_path;
+}
+
+std::vector<std::string> FullDeck::FindSuitsOfClass(const std::string &className) const {
   std::vector<std::string> out;
   for (const auto &[inst, sp] : instance_to_suit_) {
     if (inst && inst->classDef && inst->classDef->name == className) {
@@ -1919,12 +2051,10 @@ DeckGraph FullDeck::BuildGraph() const {
   // existing deck metadata (`card_map` + `suits`) rather than the VM's
   // unordered field/globals tables.
   std::function<std::unique_ptr<DeckNode>(const std::string &, pips::Instance *,
-                                           const std::string &,
-                                           std::set<pips::Instance *> &)>
-      make_class =
-          [&](const std::string &nm, pips::Instance *inst,
-              const std::string &sp,
-              std::set<pips::Instance *> &visited) -> std::unique_ptr<DeckNode> {
+                                          const std::string &,
+                                          std::set<pips::Instance *> &)>
+      make_class = [&](const std::string &nm, pips::Instance *inst, const std::string &sp,
+                       std::set<pips::Instance *> &visited) -> std::unique_ptr<DeckNode> {
     auto node = std::make_unique<DeckNode>();
     node->kind = NodeKind::Class;
     node->name = nm;
@@ -1957,7 +2087,8 @@ DeckGraph FullDeck::BuildGraph() const {
 
     auto cm_it = card_map.find(sp);
     if (cm_it != card_map.end()) {
-      for (const auto &fname : cm_it->second) emit_field(fname, "");
+      for (const auto &fname : cm_it->second)
+        emit_field(fname, "");
     }
     const std::string prefix = sp.empty() ? std::string{} : sp + "/";
     for (const auto &child_sp : suits) {
@@ -1986,10 +2117,8 @@ DeckGraph FullDeck::BuildGraph() const {
       auto child = make_class(gn, gv.as.instance, sp, visited);
       child->parent = &root;
       root.children.push_back(std::move(child));
-    } else if (gv.type == pips::ValueType::NUMBER ||
-               gv.type == pips::ValueType::STRING ||
-               gv.type == pips::ValueType::BOOL ||
-               gv.type == pips::ValueType::NIL ||
+    } else if (gv.type == pips::ValueType::NUMBER || gv.type == pips::ValueType::STRING ||
+               gv.type == pips::ValueType::BOOL || gv.type == pips::ValueType::NIL ||
                gv.type == pips::ValueType::VECTOR) {
       auto var = std::make_unique<DeckNode>();
       var->kind = NodeKind::Variable;

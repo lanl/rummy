@@ -76,15 +76,15 @@ class FullDeck : public DeckBase {
   // Construct with an explicit mode and a YAML schema describing the deck's
   // classes.  In Strict mode the schema is the single source of truth for
   // declared classes and their fields.
-  FullDeck(Mode mode, Schema schema)
-      : mode_(mode), schema_(std::move(schema)) {}
+  FullDeck(Mode mode, Schema schema) : mode_(mode), schema_(std::move(schema)) {}
   // Convenience: load the schema from a YAML file path.
   FullDeck(Mode mode, const std::string &schema_path)
       : mode_(mode), schema_(Schema::FromFile(schema_path)) {}
   FullDeck(const FullDeck &other)
       : DeckBase(other), mode_(other.mode_), schema_(other.schema_),
         suit_to_vm_name_(other.suit_to_vm_name_),
-        suit_class_name_(other.suit_class_name_) {
+        suit_class_name_(other.suit_class_name_),
+        suit_canonical_path_(other.suit_canonical_path_) {
     RebuildInstanceRegistry();
   }
   FullDeck &operator=(const FullDeck &other) {
@@ -94,6 +94,7 @@ class FullDeck : public DeckBase {
       schema_ = other.schema_;
       suit_to_vm_name_ = other.suit_to_vm_name_;
       suit_class_name_ = other.suit_class_name_;
+      suit_canonical_path_ = other.suit_canonical_path_;
       RebuildInstanceRegistry();
     }
     return *this;
@@ -105,6 +106,7 @@ class FullDeck : public DeckBase {
   void Build(std::istream &ss) override;
   void Build(std::istream &ss, std::string prepends) override;
   void Build(std::istream &ss, std::istream &prepends) override;
+  void BuildSources(const std::vector<InputSource> &sources) override;
 
   // Cards in card_map insertion order (with vector index secondary sort).
   std::vector<Card> FindSuitInOrder(const std::string &suit,
@@ -173,10 +175,14 @@ class FullDeck : public DeckBase {
   // only globals).
   std::string GetClassName(const std::string &suit) const;
 
+  std::string GetCanonicalPath(const std::string &suit) const;
+
+  void SeedSuitMetadata(const std::string &suit, const std::string &class_name,
+                        const std::string &canonical_path);
+
   // Returns every suit path whose backing instance has class name
   // `className`, sorted lexicographically. Includes nested suits.
-  std::vector<std::string>
-  FindSuitsOfClass(const std::string &className) const;
+  std::vector<std::string> FindSuitsOfClass(const std::string &className) const;
 
   // -------------------------------------------------------------------
   // Linked-tree representation
@@ -211,7 +217,7 @@ class FullDeck : public DeckBase {
 
  private:
   void RebuildInstanceRegistry();
-  void BuildInternal(std::istream &ss, const std::string &base_dir);
+  void BuildInternal(const std::vector<InputSource> &sources);
 
   // Lowering / validation mode.  See enum Mode for semantics.
   Mode mode_ = Mode::Loose;
@@ -229,12 +235,12 @@ class FullDeck : public DeckBase {
   // Used by GetClassName so the answer is available even when no live
   // instance exists yet (e.g. after construction but before Build).
   std::map<std::string, std::string> suit_class_name_;
+  std::map<std::string, std::string> suit_canonical_path_;
 
   // Device function packing: storage owned per packed function so the
   // DeviceModule view returned to callers remains valid for the lifetime
   // of the FullDeck instance.
-  std::unordered_map<std::string, pips::device::DeviceModuleStorage>
-      device_modules_;
+  std::unordered_map<std::string, pips::device::DeviceModuleStorage> device_modules_;
   std::unordered_map<std::string, std::uint32_t> device_entry_ids_;
   std::vector<std::string> device_function_order_;
 };
