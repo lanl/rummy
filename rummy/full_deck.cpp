@@ -22,7 +22,7 @@
 //   classify -> Declarative vs Pips mode per block
 //   schema  -> class RummySuit_X { var f1; var f2; ... } per suit
 //   emit    -> globals + per-block lowering into one std::string
-//   compile -> vm.interpret(program) ONCE
+//   compile -> vm.interpret(program) in ordered block-sized chunks
 //   readback -> walk vm.globals + instance graph -> populate deck table
 
 #include <algorithm>
@@ -45,6 +45,7 @@
 #include <vector>
 
 #include "full_deck.hpp"
+#include "literal.hpp"
 #include "rummy_utils.hpp"
 #include <pips/value.hpp>
 #include <pips/vm.hpp>
@@ -126,6 +127,30 @@ std::string Capitalize(const std::string &name) {
   return out;
 }
 
+std::string DeclarationKey(const std::string &raw) {
+  const auto first = raw.find_first_not_of(" \t");
+  if (first == std::string::npos) return "";
+  std::string kind;
+  std::size_t name_start = std::string::npos;
+  if (raw.compare(first, 6, "class ") == 0) {
+    kind = "class:";
+    name_start = first + 6;
+  } else if (raw.compare(first, 3, "fn ") == 0) {
+    kind = "fn:";
+    name_start = first + 3;
+  } else {
+    return "";
+  }
+  while (name_start < raw.size() && std::isspace(static_cast<unsigned char>(raw[name_start])))
+    ++name_start;
+  auto name_end = name_start;
+  while (name_end < raw.size() &&
+         (std::isalnum(static_cast<unsigned char>(raw[name_end])) || raw[name_end] == '_'))
+    ++name_end;
+  if (name_end == name_start) return "";
+  return kind + raw.substr(name_start, name_end - name_start);
+}
+
 // Count unmatched braces in a string (quote-aware). >0 means more '{'.
 int CountBraceDepth(const std::string &s) {
   int d = 0;
@@ -193,6 +218,24 @@ struct DeckIR {
 // --------------------------------------------------------------------------
 class IrParser {
  public:
+  void ParseSource(std::istream &ss, const std::string &base_dir,
+                   std::set<std::string> &include_stack, DeckIR &ir) {
+    // BuildSources inputs are independent overlays. In particular, command-line
+    // assignments belong to the globals block rather than the final suit in the
+    // preceding file. A later globals block must also remain after the preceding
+    // source's suits so dotted assignments run after those instances are created.
+    // Recursive includes still use Parse() and behave as textual insertion.
+    if (!ir.blocks.empty()) {
+      ir.blocks.push_back(
+          Block{BlockHeader{"", "", {}, 0}, {}, BlockMode::Declarative});
+      current_block_ = ir.blocks.size() - 1;
+    } else {
+      current_block_ = 0;
+    }
+    prev_suit_.clear();
+    Parse(ss, base_dir, include_stack, ir);
+  }
+
   void Parse(std::istream &ss, const std::string &base_dir,
              std::set<std::string> &include_stack, DeckIR &ir) {
     if (ir.blocks.empty()) {
@@ -831,7 +874,7 @@ void FullDeck::BuildSources(const std::vector<InputSource> &sources) {
 }
 
 // ---------------------------------------------------------------------------
-// BuildInternal — parse, classify, emit ONE pips program, interpret, readback
+// BuildInternal — parse, classify, emit ordered pips programs, interpret, readback
 // ---------------------------------------------------------------------------
 void FullDeck::BuildInternal(const std::vector<InputSource> &sources) {
   // Prepend the ctor-provided class definitions on every Build so each IR
@@ -851,11 +894,34 @@ void FullDeck::BuildInternal(const std::vector<InputSource> &sources) {
   IrParser parser;
   if (schema_.has_value() && !schema_->Empty()) {
     std::istringstream schema_stream(schema_->EmitClassDefs());
-    parser.Parse(schema_stream, "", include_stack, ir);
+    parser.ParseSource(schema_stream, "", include_stack, ir);
+  }
+  if (!retained_declaration_order_.empty()) {
+    std::ostringstream retained;
+    for (const auto &key : retained_declaration_order_) {
+      auto it = retained_declarations_.find(key);
+      if (it != retained_declarations_.end()) retained << it->second << '\n';
+    }
+    std::istringstream retained_stream(retained.str());
+    parser.ParseSource(retained_stream, "", include_stack, ir);
   }
   for (const auto &source : sources) {
     std::istringstream source_stream(source.contents);
-    parser.Parse(source_stream, source.base_dir, include_stack, ir);
+    parser.ParseSource(source_stream, source.base_dir, include_stack, ir);
+  }
+
+  // Retain complete, include-expanded function and class declarations. They
+  // are replayed on incremental builds and written into restart snapshots so
+  // later sources can call functions from the original deck.
+  for (const auto &blk : ir.blocks) {
+    if (!blk.header.suit_path.empty()) continue;
+    for (const auto &line : blk.lines) {
+      const auto key = DeclarationKey(line.raw);
+      if (key.empty()) continue;
+      if (retained_declarations_.find(key) == retained_declarations_.end())
+        retained_declaration_order_.push_back(key);
+      retained_declarations_[key] = line.raw;
+    }
   }
 
   // 1b) Detect user-declared classes (any `class X { ... }` appearing in
@@ -1092,7 +1158,7 @@ void FullDeck::BuildInternal(const std::vector<InputSource> &sources) {
   for (const auto &sp : suits)
     if (sp != "/" && !sp.empty()) known_suits.insert(sp);
 
-  // 5) EMIT — one big program buffer
+  // 5) EMIT — ordered, block-sized program buffers
   vm = pips::VM(); // fresh VM every Build (we re-seed below)
   instance_to_suit_.clear();
 
@@ -1361,6 +1427,15 @@ void FullDeck::BuildInternal(const std::vector<InputSource> &sources) {
   //     Suit blocks lazily materialize their suit (and ancestors) on first
   //     touch, then emit setattrs for the block body in source order.
   std::map<int, int> prog_line_to_loc; // 1-based prog line -> source loc
+  std::vector<std::string> programs;
+  auto flush_program = [&]() {
+    const std::string program = prog.str();
+    if (program.find_first_not_of(" \t\r\n") != std::string::npos)
+      programs.push_back(program);
+    prog.str("");
+    prog.clear();
+    prog_line_to_loc.clear();
+  };
   auto emit_line = [&](const std::string &line_text, int src_loc) {
     int prog_line = 1;
     for (char c : prog.str())
@@ -1438,6 +1513,7 @@ void FullDeck::BuildInternal(const std::vector<InputSource> &sources) {
           }
         }
       }
+      flush_program();
       continue;
     }
 
@@ -1678,23 +1754,27 @@ void FullDeck::BuildInternal(const std::vector<InputSource> &sources) {
         emit_line(translate(dl.raw), dl.loc);
       }
     }
+    flush_program();
   }
 
   // Materialize any remaining suits that exist in the deck (from prior
   // incremental Build calls) but have no block in this IR.  These must be
   // instantiated so subsequent reads can find them.
-  for (const auto &sp : all_suits_sorted)
+  for (const auto &sp : all_suits_sorted) {
     emit_instance(sp);
+    flush_program();
+  }
+  flush_program();
 
   // 6) COMPILE
-  const std::string program = prog.str();
-
   pips::VTable locals;
-  if (vm.interpret(program.c_str(), '\n', locals) != pips::InterpretResult::OK) {
-    std::stringstream m;
-    m << "Failed to compile generated pips program.\n--- program ---\n"
-      << program << "\n--- end program ---";
-    fatal(m);
+  for (const auto &program : programs) {
+    if (vm.interpret(program.c_str(), '\n', locals) != pips::InterpretResult::OK) {
+      std::stringstream m;
+      m << "Failed to compile generated pips program.\n--- program ---\n"
+        << program << "\n--- end program ---";
+      fatal(m);
+    }
   }
 
   // 7) READBACK — walk vm.globals and rebuild deck table.
@@ -2162,5 +2242,76 @@ void FullDeck::PrintGraph(std::ostream &os) const { BuildGraph().Print(os); }
 void FullDeck::SaveGraph(std::ostream &os) const { BuildGraph().Save(os); }
 
 void FullDeck::LoadGraph(std::istream &is) { Build(is); }
+
+void FullDeck::SaveRestartState(std::ostream &os) const {
+  os << "# rummy-restart-state-v1\n";
+  for (const auto &key : retained_declaration_order_) {
+    auto it = retained_declarations_.find(key);
+    if (it != retained_declarations_.end()) os << it->second << "\n\n";
+  }
+
+  auto write_cards = [&](const std::string &suit) {
+    const auto cards_it = deck.find(suit);
+    if (cards_it == deck.end()) return;
+    const auto order_it = card_map.find(suit);
+    std::vector<std::string> order;
+    if (order_it != card_map.end()) order = order_it->second;
+    if (order.empty()) {
+      for (const auto &[name, _] : cards_it->second) order.push_back(name);
+    }
+    for (const auto &name : order) {
+      const auto direct = cards_it->second.find(name);
+      if (direct != cards_it->second.end()) {
+        os << name << " = " << ToPipsLiteral(direct->second.GetValue()) << "\n";
+        continue;
+      }
+      const std::string prefix = name + "[";
+      std::vector<const Card *> elements;
+      for (const auto &[card_name, card] : cards_it->second) {
+        if (card_name.rfind(prefix, 0) == 0) elements.push_back(&card);
+      }
+      std::sort(elements.begin(), elements.end(), [](const Card *a, const Card *b) {
+        const auto ai = a->name.find_last_of('[');
+        const auto bi = b->name.find_last_of('[');
+        return std::stoi(a->name.substr(ai + 1)) < std::stoi(b->name.substr(bi + 1));
+      });
+      if (elements.empty()) continue;
+      os << name << " = [";
+      for (std::size_t i = 0; i < elements.size(); ++i) {
+        if (i != 0) os << ", ";
+        os << ToPipsLiteral(elements[i]->GetValue());
+      }
+      os << "]\n";
+    }
+  };
+
+  write_cards("/");
+  if (!deck.at("/").empty()) os << '\n';
+
+  for (const auto &suit : suits) {
+    if (suit.empty() || suit == "/") continue;
+    const auto effective = SplitSuitPath(suit);
+    auto canonical = SplitSuitPath(GetCanonicalPath(suit));
+    if (canonical.size() != effective.size()) canonical = effective;
+
+    os << '<';
+    std::string accumulated;
+    for (std::size_t i = 0; i < effective.size(); ++i) {
+      if (i != 0) {
+        os << '/';
+        accumulated += '/';
+      }
+      accumulated += effective[i];
+      std::string node = canonical[i];
+      const auto class_name = GetClassName(accumulated);
+      if (!class_name.empty() && Capitalize(node) != class_name) node = class_name;
+      os << node;
+      if (node != effective[i]) os << '(' << effective[i] << ')';
+    }
+    os << ">\n";
+    write_cards(suit);
+    os << '\n';
+  }
+}
 
 } // namespace Rummy

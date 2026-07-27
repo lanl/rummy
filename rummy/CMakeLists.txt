@@ -14,7 +14,7 @@
 # This file was created in part with generative AI
 
 # Generate library
-add_library(rummylib deck_base.cpp simple_deck.cpp full_deck.cpp deck_graph.cpp yaml_schema.cpp)
+add_library(rummylib deck_base.cpp simple_deck.cpp full_deck.cpp deck_graph.cpp literal.cpp yaml_schema.cpp)
 
 # Add alias target for consistency
 add_library(Rummy::rummy ALIAS rummylib)

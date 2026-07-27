@@ -583,6 +583,87 @@ TEST_CASE("Deck2 - user-defined class declared in globals, used in a block") {
   FLOAT_REQUIRE(d.GetCardValue<double>("g", "norm_sq"), 25.0);
 }
 
+TEST_CASE("Deck2 - restart state preserves declarations and accepts overrides") {
+  Rummy::FullDeck original;
+  std::stringstream input;
+  input << "fn square(x) { return x * x }\n"
+        << "class Point {\n"
+        << "  var x\n"
+        << "  var y\n"
+        << "  fn norm_sq() { return this.x * this.x + this.y * this.y }\n"
+        << "}\n"
+        << "title = \"plain restart state\"\n"
+        << "<Point(p)>\n"
+        << "x = 3\n"
+        << "y = 4\n"
+        << "values = [1, 2, 3]\n"
+        << "norm = p.norm_sq()\n";
+  original.Build(input);
+
+  std::ostringstream saved;
+  original.SaveRestartState(saved);
+
+  Rummy::FullDeck restarted;
+  std::vector<Rummy::InputSource> sources = {
+      {"<restart>", saved.str(), ""},
+      {"<override>", "<Point(p)>\ny = 12\nnorm = p.norm_sq()\nsquared = square(y)\n",
+       ""}};
+  restarted.BuildSources(sources);
+
+  REQUIRE(restarted.GetClassName("p") == "Point");
+  FLOAT_REQUIRE(restarted.GetCardValue<double>("p", "x"), 3.0);
+  FLOAT_REQUIRE(restarted.GetCardValue<double>("p", "y"), 12.0);
+  FLOAT_REQUIRE(restarted.GetCardValue<double>("p", "norm"), 153.0);
+  FLOAT_REQUIRE(restarted.GetCardValue<double>("p", "squared"), 144.0);
+  REQUIRE(restarted.GetVector<double>("p", "values") ==
+          std::vector<double>{1.0, 2.0, 3.0});
+  REQUIRE(restarted.GetCardValue<std::string>("/", "title") ==
+      "plain restart state");
+}
+
+TEST_CASE("Deck2 - large restart state compiles across block-sized programs") {
+  std::stringstream input;
+  for (int i = 0; i < 140; ++i) {
+    input << "<Node(node_" << i << ")>\nvalue = " << i << "\n";
+  }
+
+  Rummy::FullDeck original;
+  original.Build(input);
+  std::ostringstream saved;
+  original.SaveRestartState(saved);
+
+  Rummy::FullDeck restarted;
+  std::istringstream restart_source(saved.str());
+  restarted.Build(restart_source);
+
+  FLOAT_REQUIRE(restarted.GetCardValue<double>("node_0", "value"), 0.0);
+  FLOAT_REQUIRE(restarted.GetCardValue<double>("node_139", "value"), 139.0);
+}
+
+TEST_CASE("Deck2 - command-line source starts in globals after declarative suit") {
+  Rummy::FullDeck d;
+  std::vector<Rummy::InputSource> sources = {
+      {"disk.par",
+       "<parthenon/time>\n"
+       "nlim = -1\n"
+       "<drag>\n"
+       "type = \"self\"\n"
+       "<cooling>\n"
+       "type = \"beta\"\n"
+       "tref = \"powerlaw\"\n"
+       "beta0 = 1e-8\n",
+       ""},
+      {"<command-line>", "parthenon.time.nlim = 1\n", ""}};
+
+  d.BuildSources(sources);
+
+  REQUIRE(d.GetCardValue<std::string>("drag", "type") == "self");
+  REQUIRE(d.GetCardValue<std::string>("cooling", "type") == "beta");
+  REQUIRE(d.GetCardValue<std::string>("cooling", "tref") == "powerlaw");
+  FLOAT_REQUIRE(d.GetCardValue<double>("cooling", "beta0"), 1e-8);
+  FLOAT_REQUIRE(d.GetCardValue<double>("parthenon/time", "nlim"), 1.0);
+}
+
 // ---------------------------------------------------------------------------
 // New pips feature coverage: native vectors, user-declared classes, and
 // device function packing/calling.

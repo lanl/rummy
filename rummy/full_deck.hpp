@@ -82,6 +82,8 @@ class FullDeck : public DeckBase {
       : mode_(mode), schema_(Schema::FromFile(schema_path)) {}
   FullDeck(const FullDeck &other)
       : DeckBase(other), mode_(other.mode_), schema_(other.schema_),
+        retained_declarations_(other.retained_declarations_),
+        retained_declaration_order_(other.retained_declaration_order_),
         suit_to_vm_name_(other.suit_to_vm_name_),
         suit_class_name_(other.suit_class_name_),
         suit_canonical_path_(other.suit_canonical_path_) {
@@ -92,6 +94,8 @@ class FullDeck : public DeckBase {
       DeckBase::operator=(other);
       mode_ = other.mode_;
       schema_ = other.schema_;
+      retained_declarations_ = other.retained_declarations_;
+      retained_declaration_order_ = other.retained_declaration_order_;
       suit_to_vm_name_ = other.suit_to_vm_name_;
       suit_class_name_ = other.suit_class_name_;
       suit_canonical_path_ = other.suit_canonical_path_;
@@ -209,6 +213,13 @@ class FullDeck : public DeckBase {
   // legal pips source.
   void LoadGraph(std::istream &is);
 
+  // Save retained function/class declarations together with evaluated deck
+  // values. The result is legal Rummy source and can be the first source in
+  // a later BuildSources() call.
+  void SaveRestartState(std::ostream &os) const override;
+
+  Mode GetMode() const { return mode_; }
+
  protected:
   void CopyVmState(const pips::VM &other_vm) override {
     CopyVmStateImpl(other_vm);
@@ -225,6 +236,11 @@ class FullDeck : public DeckBase {
   // mode this is required; in Loose mode it merely augments class-name
   // resolution and field defaults.
   std::optional<Schema> schema_;
+
+  // Include-expanded global function/class declarations needed to compile
+  // restart override inputs without reopening the original source files.
+  std::map<std::string, std::string> retained_declarations_;
+  std::vector<std::string> retained_declaration_order_;
 
   // Per-suit instance registry, populated post-interpret by the readback.
   std::unordered_map<pips::Instance *, std::string> instance_to_suit_;

@@ -375,6 +375,10 @@ class DeckBase {
   // order. Subclasses may override for custom formatting.
   virtual void WriteDeck(std::ostream &os) const;
 
+  // Emit a self-contained, evaluated representation suitable for embedding
+  // in a restart file and compiling before later override sources.
+  virtual void SaveRestartState(std::ostream &os) const { WriteDeck(os); }
+
   // ---- Seeding ---------------------------------------------------------
   void SeedGlobals(
       const std::map<std::string, std::map<std::string, Card>> &new_cards,
