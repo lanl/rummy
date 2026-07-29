@@ -19,8 +19,34 @@ list(APPEND unit_tests_SOURCES
 add_executable(unit_tests "${unit_tests_SOURCES}")
 target_link_libraries(unit_tests PRIVATE Rummy::rummy catch2_main)
 
+# Deck2 test suite — separate executable so the Deck baseline is never touched
+add_executable(unit_tests2 test2.cpp)
+target_link_libraries(unit_tests2 PRIVATE Rummy::rummy catch2_main)
+# Provide the fixture directory path to test2.cpp
+target_compile_definitions(unit_tests2 PRIVATE
+  RUMMY_TEST_INPUT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/inputs"
+)
+
+# Strict-mode FullDeck test suite.  Uses a separate binary so fatal() failures
+# don't terminate the loose-mode test process.
+add_executable(unit_tests3_strict test3_strict.cpp)
+target_link_libraries(unit_tests3_strict PRIVATE Rummy::rummy catch2_main)
+target_compile_definitions(unit_tests3_strict PRIVATE
+  RUMMY_TEST_INPUT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/inputs"
+)
+
+# DeckGraph (linked-tree) tests for FullDeck.
+add_executable(unit_tests4_graph test4_graph.cpp)
+target_link_libraries(unit_tests4_graph PRIVATE Rummy::rummy catch2_main)
+target_compile_definitions(unit_tests4_graph PRIVATE
+  RUMMY_TEST_INPUT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/inputs"
+)
+
 enable_testing()
 add_test(NAME run_units COMMAND unit_tests)
+add_test(NAME run_units2 COMMAND unit_tests2)
+add_test(NAME run_units3_strict COMMAND unit_tests3_strict)
+add_test(NAME run_units4_graph COMMAND unit_tests4_graph)
 add_custom_target(run_tests 
   COMMAND ${CMAKE_CTEST_COMMAND} -V
   DEPENDS test

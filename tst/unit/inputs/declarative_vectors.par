@@ -1,0 +1,5 @@
+# declarative_vectors.par
+# Block with vector RHS and slice assignment
+<vecblock>
+a = [10, 20, 30]
+b[:2] = [100, 200]

@@ -1,0 +1,10 @@
+class Gas {
+  var rho
+  var T
+  var eos
+}
+
+class Eos {
+  var type = "ideal"
+  var gamma = 1.4
+}

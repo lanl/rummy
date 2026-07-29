@@ -1,0 +1,39 @@
+
+<problem>
+  title = "simple"
+<problem/output>
+ file = "output.txt"
+
+<problem(prob)>
+  title = "my problem"
+
+<problem(prob)/mat(mat1)>
+  name = "material 1"
+  gamma = 1.4
+
+<problem(prob)/mat(mat2)>
+  name = "material 2"
+  gamma = prob.mat1.gamma * 1.5
+<./eos>
+ type = "ideal"
+
+
+# Should translate to
+# class Problem {}
+# class Output {}
+# class Mat {}
+# class Eos {}
+#  var problem = new Problem {}
+# setattr(problem, "title", "my problem");
+# setattr(problem, "output", new Output {});
+# setattr(problem.output, "file", "output.txt");
+#  var prob = new Problem {}
+#  setattr(prob, "title", "my problem");
+#  setattr(prob, "mat1", new Mat {});
+#  setattr(prob.mat1, "name", "material 1");
+# setattr(prob.mat1, "gamma", 1.4);
+#  setattr(prob, "mat2", new Mat {});
+#  setattr(prob.mat2, "name", "material 2");
+# setattr(prob.mat2, "gamma", prob.mat1.gamma * 1.5);
+#  setattr(prob.mat2, "eos", new Eos{});
+#  setattr(prob.mat2.eos, "type", "ideal");

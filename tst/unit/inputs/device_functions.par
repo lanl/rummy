@@ -1,0 +1,18 @@
+# Pips functions defined in the deck's globals. They use only the
+# numeric/bool subset accepted by the device packer.
+fn cube(x) {
+  return x * x * x
+}
+
+fn poly(a, b, c, x) {
+  return a * x * x + b * x + c
+}
+
+fn clamp(x, lo, hi) {
+  if (x < lo) { return lo }
+  if (x > hi) { return hi }
+  return x
+}
+
+<info>
+note = "host-side cards still work"

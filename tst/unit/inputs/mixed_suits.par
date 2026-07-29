@@ -1,0 +1,10 @@
+# mixed_suits.par
+# Multiple suits: one anonymous, one named instance.
+# Uses external cross-suit reference (no self-reference in either block).
+<alpha>
+p = 10
+q = 20
+
+<beta(b2)>
+r = 30
+s = alpha.p + alpha.q

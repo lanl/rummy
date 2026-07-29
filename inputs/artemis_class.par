@@ -1,0 +1,187 @@
+
+class Artemis {
+ var problem;
+ var coordinates;
+  var physical_units;
+  var unit_conversion;
+}
+
+class Parthenon {
+  var job;
+  var output;
+  var time;
+  var mesh;
+  var swarm;
+  var meshblock;
+}
+
+class Job { 
+  var problem_id;
+}
+class Time {
+  var nlim;
+  var tlim;
+  var integrator;
+  var ncycle_out;
+}
+
+class Mesh {
+  var nx1;
+  var x1min;
+  var x1max;
+  var ix1_bc;
+  var ox1_bc;
+
+  var nx3;
+  var x3min;
+  var x3max;
+  var ix3_bc;
+  var ox3_bc;
+
+  var nx2;
+  var x2min;
+  var x2max;
+  var ix2_bc;
+  var ox2_bc;
+}
+
+class Swarm {
+  var ix2_bc;
+  var ox2_bc;
+  var ix3_bc;
+  var ox3_bc;
+  var ix1_bc;
+  var ox1_bc;
+
+}
+
+class Meshblock {
+  var nx1;
+  var nx2;
+  var nx3;
+}
+
+class Output {
+  var variables;
+  var file_type;
+  var dt; 
+}
+
+class Physics {
+  var gas = false;
+  var radiation = false;
+  var dust = false;
+  var viscosity = false;
+  var nbody = false;
+  var gravity = false;
+}
+
+class Gas {
+  var gamma;
+  var mu;
+  var cfl;
+  var reconstruct;
+  var riemann;
+  var opacity;
+  var dfloor;
+  var siefloor;
+  var eos;
+  var viscosity;
+}
+
+class Eos {
+  var ideal;
+}
+class Ideal {
+  var gamma;
+}
+class Viscosity {
+  var type;
+  var alpha;
+}
+class Gravity {
+  var nbody;
+}
+
+class Nbody {
+  var integrator;
+  var particle;
+  var binary;
+}
+
+class Particle {
+  var mass;
+  var couple;
+  var soft;
+  var initialize;
+}
+
+class Binary {
+  var primary;
+  var secondary;
+  var a;
+  var mass;
+}
+
+class Soft {
+  var type;
+  var radius;
+}
+
+class Initialize {
+  var x1 = 0.0;
+  var x2 = 0.0;
+  var x3 = 0.0;
+  var vx1 = 0.0;
+  var vx2 = 0.0;
+  var vx3 = 0.0;
+}
+
+class Radiation {
+  var moment;
+  var imc;
+}
+
+class Imc {
+  var use_ddmc;
+  var num_particles;
+}
+class Moment {
+  var cfl;
+  var riemann;
+  var reconstruct;
+  var efloor;
+  var closure;
+  var creduc;
+}
+
+class Opacity {
+  var absorption;
+}
+class Absorption {
+  var opacity_model;
+  var coef_kappa_a;
+  var rho_exp;
+  var temp_exp;
+}
+class Problem {
+  var r0;
+  var rho0;
+  var dslope;
+  var flare;
+  var h0;
+  var polytropic_index;
+  # var rhol;
+  # var rhor;
+  # var vxr;
+  # var vxl;
+  # var tl;
+  # var tr;
+  # var xdisc;
+}
+
+class Pc {
+  var c = 3e10;
+}
+
+var pc = new Pc {};

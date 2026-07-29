@@ -1,0 +1,16 @@
+# Strict-mode input: classes Gas/Eos come from the YAML schema fixture.
+
+<Gas(mat1)>
+rho = 1.0
+T   = 300.0, 100.0, 200.0
+
+<./eos>
+type = "ideal"
+gamma = 5.0/3.0
+
+<Gas(mat2)>
+rho = 2.0
+T   = 350.0
+<./eos>
+type = "table"
+gamma = 1.6

@@ -1,0 +1,5 @@
+# include_child.par
+# Child file included by include_root.par
+<child_suit>
+child_val = 99
+child_str = "from_child"

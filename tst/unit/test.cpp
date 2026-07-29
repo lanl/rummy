@@ -1,14 +1,17 @@
 //========================================================================================
-// (C) (or copyright) 2025-2026. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2025-2026. Triad National Security, LLC. All rights
+// reserved.
 //
-// This program was produced under U.S. Government contract 89233218CNA000001 for Los
-// Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
-// for the U.S. Department of Energy/National Nuclear Security Administration. All rights
-// in the program are reserved by Triad National Security, LLC, and the U.S. Department
-// of Energy/National Nuclear Security Administration. The Government is granted for
-// itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
-// license in this material to reproduce, prepare derivative works, distribute copies to
-// the public, perform publicly and display publicly, and to permit others to do so.
+// This program was produced under U.S. Government contract 89233218CNA000001
+// for Los Alamos National Laboratory (LANL), which is operated by Triad
+// National Security, LLC for the U.S. Department of Energy/National Nuclear
+// Security Administration. All rights in the program are reserved by Triad
+// National Security, LLC, and the U.S. Department of Energy/National Nuclear
+// Security Administration. The Government is granted for itself and others
+// acting on its behalf a nonexclusive, paid-up, irrevocable worldwide license
+// in this material to reproduce, prepare derivative works, distribute copies to
+// the public, perform publicly and display publicly, and to permit others to do
+// so.
 //========================================================================================
 
 // This file was created in part with generative AI
@@ -17,18 +20,21 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
-#include "deck.hpp"
+#include "simple_deck.hpp"
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <sstream>
 #include <unistd.h>
 
-#define FLOAT_REQUIRE(a, b) REQUIRE_THAT(a, Catch::Matchers::WithinAbs(b, 1e-16))
-#define FLOAT_REQUIRE_TOL(a, b, tol) REQUIRE_THAT(a, Catch::Matchers::WithinAbs(b, tol))
+#define FLOAT_REQUIRE(a, b)                                                    \
+  REQUIRE_THAT(a, Catch::Matchers::WithinAbs(b, 1e-16))
+#define FLOAT_REQUIRE_TOL(a, b, tol)                                           \
+  REQUIRE_THAT(a, Catch::Matchers::WithinAbs(b, tol))
 
 TEST_CASE("Deck") {
   GIVEN("A simple deck") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "global1 = 42\n"
        << "<suit1>\n"
@@ -104,7 +110,7 @@ TEST_CASE("Deck") {
 
 TEST_CASE("Deck - String Values") {
   GIVEN("A deck with string values") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "global_str = \"hello\"\n"
        << "<suit1>\n"
@@ -123,7 +129,8 @@ TEST_CASE("Deck - String Values") {
     }
 
     WHEN("We add a string card") {
-      deck.AddCard("suit1", "card3", std::string("test"), "String card comment");
+      deck.AddCard("suit1", "card3", std::string("test"),
+                   "String card comment");
       THEN("The string card should be added correctly") {
         auto value = deck.GetCardValue<std::string>("suit1", "card3");
         REQUIRE(value == "test");
@@ -136,7 +143,7 @@ TEST_CASE("Deck - String Values") {
 
 TEST_CASE("Deck - Boolean Values") {
   GIVEN("A deck with boolean values") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "global_bool = true\n"
        << "<suit1>\n"
@@ -168,7 +175,7 @@ TEST_CASE("Deck - Boolean Values") {
 
 TEST_CASE("Deck - Complex Expressions") {
   GIVEN("A deck with complex expressions") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "global1 = 10\n"
        << "global2 = 20\n"
@@ -197,7 +204,7 @@ TEST_CASE("Deck - Complex Expressions") {
 
 TEST_CASE("Deck - Vector Operations") {
   GIVEN("A deck with vector operations") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "global_vec = [1, 2, 3]\n"
        << "<suit1>\n"
@@ -216,7 +223,8 @@ TEST_CASE("Deck - Vector Operations") {
     }
 
     WHEN("We add a vector") {
-      deck.AddVector("suit1", "card2", std::vector<double>{4.0, 5.0, 6.0}, "Vector comment");
+      deck.AddVector("suit1", "card2", std::vector<double>{4.0, 5.0, 6.0},
+                     "Vector comment");
 
       THEN("The vector should be added correctly") {
         auto vector_val = deck.GetVector<double>("suit1", "card2");
@@ -231,7 +239,8 @@ TEST_CASE("Deck - Vector Operations") {
     }
 
     WHEN("We update a vector") {
-      deck.UpdateVector("suit1", "card1", std::vector<double>{7.0, 8.0}, "Updated vector comment");
+      deck.UpdateVector("suit1", "card1", std::vector<double>{7.0, 8.0},
+                        "Updated vector comment");
 
       THEN("The vector should be updated correctly") {
         auto vector_val = deck.GetVector<double>("suit1", "card1");
@@ -249,7 +258,7 @@ TEST_CASE("Deck - Vector Operations") {
 
 TEST_CASE("Deck - Build with String Parameter") {
   GIVEN("A deck built with string parameter") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::string content = "global1 = 42\n<suit1>\ncard1 = global1\n";
     std::stringstream ss(content);
 
@@ -266,7 +275,7 @@ TEST_CASE("Deck - Build with String Parameter") {
 
 TEST_CASE("Deck - Build with Additional Configuration") {
   GIVEN("A deck with additional configuration") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::string content = "global1 = c * 2\n<suit1>\ncard1 = global1\n";
     std::string config = "c = 3e8\n";
     std::stringstream ss(content);
@@ -325,7 +334,8 @@ TEST_CASE("Card - Constructor and Methods") {
 
 TEST_CASE("Card - Different Value Types") {
   GIVEN("Cards with different value types") {
-    Rummy::Card string_card("spades", "king", std::string("face"), "String card", -1);
+    Rummy::Card string_card("spades", "king", std::string("face"),
+                            "String card", -1);
     Rummy::Card bool_card("clubs", "joker", true, "Boolean card", -1);
     Rummy::Card int_card("diamonds", "ten", 10, "Integer card", -1);
 
@@ -357,7 +367,7 @@ TEST_CASE("Card - Different Value Types") {
 
 TEST_CASE("Deck - Edge Cases") {
   GIVEN("A deck for edge case testing") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
 
     WHEN("We build an empty deck") {
       std::stringstream empty_ss;
@@ -405,7 +415,7 @@ TEST_CASE("Card - Comment Operations") {
   }
 
   GIVEN("Multiple cards with different comments") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     deck.AddCard("test", "card1", 10, "Comment 1");
     deck.AddCard("test", "card2", 20, "Comment 2");
     deck.AddCard("test", "card3", 30, "Comment 3");
@@ -421,10 +431,11 @@ TEST_CASE("Card - Comment Operations") {
     WHEN("We update one card's comment") {
       auto &card = deck.GetCard("test", "card2");
       card.UpdateComment("Modified comment");
-      
+
       THEN("Only that card's comment should change") {
         REQUIRE(deck.GetCard("test", "card1").GetComment() == "Comment 1");
-        REQUIRE(deck.GetCard("test", "card2").GetComment() == "Modified comment");
+        REQUIRE(deck.GetCard("test", "card2").GetComment() ==
+                "Modified comment");
         REQUIRE(deck.GetCard("test", "card3").GetComment() == "Comment 3");
       }
     }
@@ -432,7 +443,7 @@ TEST_CASE("Card - Comment Operations") {
 }
 TEST_CASE("Deck - Hash inside quoted string value") {
   GIVEN("A deck where a string value contains '#'") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "<suit1>\n"
        << "url = \"http://example.com\"  # real comment\n"
@@ -440,7 +451,8 @@ TEST_CASE("Deck - Hash inside quoted string value") {
     deck.Build(ss);
 
     THEN("The string values should be preserved verbatim") {
-      REQUIRE(deck.GetCardValue<std::string>("suit1", "url") == "http://example.com");
+      REQUIRE(deck.GetCardValue<std::string>("suit1", "url") ==
+              "http://example.com");
       REQUIRE(deck.GetCardValue<std::string>("suit1", "tag") == "hello#world");
     }
     THEN("The trailing comment on 'url' should be captured") {
@@ -451,7 +463,7 @@ TEST_CASE("Deck - Hash inside quoted string value") {
 
 TEST_CASE("Deck - Deck copy constructor and assignment") {
   GIVEN("A built deck") {
-    Rummy::Deck original;
+    Rummy::SimpleDeck original;
     std::stringstream ss;
     ss << "g = 9\n"
        << "<physics>\n"
@@ -461,7 +473,7 @@ TEST_CASE("Deck - Deck copy constructor and assignment") {
     original.Build(ss);
 
     WHEN("We copy-construct a new deck") {
-      Rummy::Deck copy(original);
+      Rummy::SimpleDeck copy(original);
 
       THEN("All suits are present in the copy") {
         REQUIRE(copy.DoesSuitExist("/"));
@@ -483,7 +495,7 @@ TEST_CASE("Deck - Deck copy constructor and assignment") {
     }
 
     WHEN("We copy-assign a new deck") {
-      Rummy::Deck assigned;
+      Rummy::SimpleDeck assigned;
       assigned = original;
 
       THEN("All suits are present in the assigned deck") {
@@ -501,12 +513,12 @@ TEST_CASE("Deck - Deck copy constructor and assignment") {
 }
 
 TEST_CASE("Deck - AddCard adds new suit to ordering") {
-    GIVEN("An empty deck") {
-    Rummy::Deck deck;
+  GIVEN("An empty deck") {
+    Rummy::SimpleDeck deck;
 
     WHEN("We add cards to a new suit programmatically") {
       deck.AddCard("alpha", "x", 1.0);
-      deck.AddCard("beta",  "y", 2.0);
+      deck.AddCard("beta", "y", 2.0);
 
       THEN("Both suits appear in order") {
         auto suits = deck.GetSuitsInOrder();
@@ -514,7 +526,7 @@ TEST_CASE("Deck - AddCard adds new suit to ordering") {
         REQUIRE(deck.DoesSuitExist("beta"));
         // '/' is always first; alpha and beta should follow
         REQUIRE(std::find(suits.begin(), suits.end(), "alpha") != suits.end());
-        REQUIRE(std::find(suits.begin(), suits.end(), "beta")  != suits.end());
+        REQUIRE(std::find(suits.begin(), suits.end(), "beta") != suits.end());
       }
 
       THEN("WriteDeck includes both suits") {
@@ -530,7 +542,8 @@ TEST_CASE("Deck - AddCard adds new suit to ordering") {
 
       THEN("The new suit appears in ordering") {
         auto suits = deck.GetSuitsInOrder();
-        REQUIRE(std::find(suits.begin(), suits.end(), "newsuit") != suits.end());
+        REQUIRE(std::find(suits.begin(), suits.end(), "newsuit") !=
+                suits.end());
       }
       THEN("WriteDeck includes the new suit") {
         std::ostringstream out;
@@ -543,7 +556,7 @@ TEST_CASE("Deck - AddCard adds new suit to ordering") {
 
 TEST_CASE("Deck - GetVector correct order for large vectors") {
   GIVEN("A deck with a vector of more than 9 elements") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "<suit1>\n";
     // Build a 12-element vector inline
@@ -565,11 +578,11 @@ TEST_CASE("Deck - GetVector correct order for large vectors") {
 
 TEST_CASE("Deck - Second Build call preserves nested suit references") {
   GIVEN("A deck with a nested suit (gas/eos)") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss1;
     ss1 << "<gas>\n"
         << "gamma = 1.4\n"
-        << "<../eos>\n"       
+        << "<./eos>\n"
         << "cv = 1.0\n";
     deck.Build(ss1);
 
@@ -580,7 +593,8 @@ TEST_CASE("Deck - Second Build call preserves nested suit references") {
       deck.Build(ss2);
 
       THEN("No phantom suit is created") {
-        // Should have: '/', 'gas', 'gas/eos', 'result' — not a spurious 'gas_eos'
+        // Should have: '/', 'gas', 'gas/eos', 'result' — not a spurious
+        // 'gas_eos'
         REQUIRE_FALSE(deck.DoesSuitExist("gas_eos"));
         REQUIRE(deck.DoesSuitExist("gas/eos"));
       }
@@ -593,10 +607,10 @@ TEST_CASE("Deck - Second Build call preserves nested suit references") {
 
 TEST_CASE("Deck - WriteDeck preserves declaration order") {
   GIVEN("A deck where 'b' is declared before 'a' but 'a' references 'b'") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "<suit1>\n"
-       << "z_base = 10\n"        // alphabetically last, declared first
+       << "z_base = 10\n"             // alphabetically last, declared first
        << "a_derived = z_base * 2\n"; // alphabetically first, declared second
     deck.Build(ss);
 
@@ -604,7 +618,7 @@ TEST_CASE("Deck - WriteDeck preserves declaration order") {
       std::ostringstream out;
       deck.WriteDeck(out);
 
-      Rummy::Deck deck2;
+      Rummy::SimpleDeck deck2;
       std::istringstream in(out.str());
       deck2.Build(in);
 
@@ -617,7 +631,7 @@ TEST_CASE("Deck - WriteDeck preserves declaration order") {
 
 TEST_CASE("Deck - Multiline continuation preserves comment") {
   GIVEN("A deck with a multiline value") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "<suit1>\n"
        << "x = 1 +  &  # part one\n"
@@ -636,13 +650,13 @@ TEST_CASE("Deck - Multiline continuation preserves comment") {
   }
 }
 
-TEST_CASE("Deck - Relative suit name (..)") {
+TEST_CASE("Deck - Relative suit name (.)") {
   GIVEN("A deck using relative suit syntax") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "<gas>\n"
        << "name = \"hydrogen\"\n"
-       << "<../eos>\n"
+       << "<./eos>\n"
        << "gamma = 1.67\n"
        << "type = \"ideal\"\n"
        << "cv = 1.0 / (gamma - 1.0)\n";
@@ -655,7 +669,8 @@ TEST_CASE("Deck - Relative suit name (..)") {
     THEN("Card values are correct") {
       REQUIRE(deck.GetCardValue<std::string>("gas", "name") == "hydrogen");
       REQUIRE(deck.GetCardValue<std::string>("gas/eos", "type") == "ideal");
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("gas/eos", "gamma"), 1.67, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("gas/eos", "gamma"), 1.67,
+                        1e-12);
       FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("gas/eos", "cv"),
                         1.0 / (1.67 - 1.0), 1e-12);
     }
@@ -664,7 +679,7 @@ TEST_CASE("Deck - Relative suit name (..)") {
 
 TEST_CASE("pips - Arithmetic operators") {
   GIVEN("A deck with arithmetic expressions") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "<math>\n"
        << "add      = 3 + 4\n"
@@ -679,22 +694,22 @@ TEST_CASE("pips - Arithmetic operators") {
     deck.Build(ss);
 
     THEN("Results are correct") {
-      FLOAT_REQUIRE(deck.GetCardValue<double>("math", "add"),    7.0);
-      FLOAT_REQUIRE(deck.GetCardValue<double>("math", "sub"),    7.0);
-      FLOAT_REQUIRE(deck.GetCardValue<double>("math", "mul"),   42.0);
-      FLOAT_REQUIRE(deck.GetCardValue<double>("math", "div"),    0.25);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("math", "add"), 7.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("math", "sub"), 7.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("math", "mul"), 42.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("math", "div"), 0.25);
       FLOAT_REQUIRE(deck.GetCardValue<double>("math", "intdiv"), 3.0);
-      FLOAT_REQUIRE(deck.GetCardValue<double>("math", "mod"),    1.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("math", "mod"), 1.0);
       FLOAT_REQUIRE(deck.GetCardValue<double>("math", "pow_op"), 1024.0);
-      FLOAT_REQUIRE(deck.GetCardValue<double>("math", "neg"),   -5.0);
-      FLOAT_REQUIRE(deck.GetCardValue<double>("math", "uplus"),  3.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("math", "neg"), -5.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("math", "uplus"), 3.0);
     }
   }
 }
 
 TEST_CASE("pips - Comparison and logical operators") {
   GIVEN("A deck with comparison and logical expressions") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "<logic>\n"
        << "eq_true  = 1 == 1\n"
@@ -715,22 +730,22 @@ TEST_CASE("pips - Comparison and logical operators") {
     deck.Build(ss);
 
     THEN("Comparison results are correct") {
-      REQUIRE(deck.GetCardValue<bool>("logic", "eq_true")  == true);
+      REQUIRE(deck.GetCardValue<bool>("logic", "eq_true") == true);
       REQUIRE(deck.GetCardValue<bool>("logic", "eq_false") == false);
-      REQUIRE(deck.GetCardValue<bool>("logic", "ne_true")  == true);
+      REQUIRE(deck.GetCardValue<bool>("logic", "ne_true") == true);
       REQUIRE(deck.GetCardValue<bool>("logic", "ne_false") == false);
-      REQUIRE(deck.GetCardValue<bool>("logic", "gt")       == true);
-      REQUIRE(deck.GetCardValue<bool>("logic", "ge")       == true);
-      REQUIRE(deck.GetCardValue<bool>("logic", "lt")       == true);
-      REQUIRE(deck.GetCardValue<bool>("logic", "le")       == true);
+      REQUIRE(deck.GetCardValue<bool>("logic", "gt") == true);
+      REQUIRE(deck.GetCardValue<bool>("logic", "ge") == true);
+      REQUIRE(deck.GetCardValue<bool>("logic", "lt") == true);
+      REQUIRE(deck.GetCardValue<bool>("logic", "le") == true);
     }
     THEN("Logical operators are correct") {
       REQUIRE(deck.GetCardValue<bool>("logic", "and_tt") == true);
       REQUIRE(deck.GetCardValue<bool>("logic", "and_tf") == false);
-      REQUIRE(deck.GetCardValue<bool>("logic", "or_ff")  == false);
-      REQUIRE(deck.GetCardValue<bool>("logic", "or_tf")  == true);
-      REQUIRE(deck.GetCardValue<bool>("logic", "not_t")  == false);
-      REQUIRE(deck.GetCardValue<bool>("logic", "not_f")  == true);
+      REQUIRE(deck.GetCardValue<bool>("logic", "or_ff") == false);
+      REQUIRE(deck.GetCardValue<bool>("logic", "or_tf") == true);
+      REQUIRE(deck.GetCardValue<bool>("logic", "not_t") == false);
+      REQUIRE(deck.GetCardValue<bool>("logic", "not_f") == true);
     }
     THEN("Ternary operator is correct") {
       FLOAT_REQUIRE(deck.GetCardValue<double>("logic", "ternary"), 42.0);
@@ -740,26 +755,26 @@ TEST_CASE("pips - Comparison and logical operators") {
 
 TEST_CASE("pips - Bitwise operators") {
   GIVEN("A deck with bitwise expressions") {
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "<bits>\n"
-       << "band   = 12 & 10\n"    // 0b1100 & 0b1010 = 0b1000 = 8
-       << "bor    = 12 | 10\n"    // 0b1100 | 0b1010 = 0b1110 = 14
-       << "xor    = 12 xor 10\n"  // 0b1100 ^ 0b1010 = 0b0110 = 6 (keyword)
-       << "xor_c  = 12 ^ 10\n"    // 0b1100 ^ 0b1010 = 0b0110 = 6 (keyword)
-       << "bnot   = ~0\n"         // ~0 = -1 (all bits set)
-       << "lshift = 1 << 4\n"     // 1 << 4 = 16
-       << "rshift = 32 >> 2\n";   // 32 >> 2 = 8
+       << "band   = 12 & 10\n"   // 0b1100 & 0b1010 = 0b1000 = 8
+       << "bor    = 12 | 10\n"   // 0b1100 | 0b1010 = 0b1110 = 14
+       << "xor    = 12 xor 10\n" // 0b1100 ^ 0b1010 = 0b0110 = 6 (keyword)
+       << "xor_c  = 12 ^ 10\n"   // 0b1100 ^ 0b1010 = 0b0110 = 6 (keyword)
+       << "bnot   = ~0\n"        // ~0 = -1 (all bits set)
+       << "lshift = 1 << 4\n"    // 1 << 4 = 16
+       << "rshift = 32 >> 2\n";  // 32 >> 2 = 8
     deck.Build(ss);
 
     THEN("Bitwise results are correct") {
-      FLOAT_REQUIRE(deck.GetCardValue<double>("bits", "band"),    8.0);
-      FLOAT_REQUIRE(deck.GetCardValue<double>("bits", "bor"),    14.0);
-      FLOAT_REQUIRE(deck.GetCardValue<double>("bits", "xor"),     6.0);
-      FLOAT_REQUIRE(deck.GetCardValue<double>("bits", "xor_c"),     6.0);
-      FLOAT_REQUIRE(deck.GetCardValue<double>("bits", "bnot"),   -1.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("bits", "band"), 8.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("bits", "bor"), 14.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("bits", "xor"), 6.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("bits", "xor_c"), 6.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("bits", "bnot"), -1.0);
       FLOAT_REQUIRE(deck.GetCardValue<double>("bits", "lshift"), 16.0);
-      FLOAT_REQUIRE(deck.GetCardValue<double>("bits", "rshift"),  8.0);
+      FLOAT_REQUIRE(deck.GetCardValue<double>("bits", "rshift"), 8.0);
     }
   }
 }
@@ -767,7 +782,7 @@ TEST_CASE("pips - Bitwise operators") {
 TEST_CASE("pips - Math functions") {
   GIVEN("A deck with all math function calls") {
     const double pi = std::acos(-1.0);
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     std::stringstream ss;
     ss << "<fn>\n"
        << "pi_val  = pi\n"
@@ -813,9 +828,10 @@ TEST_CASE("pips - Math functions") {
       FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "pi_val"), pi, 1e-12);
     }
     THEN("Exponential and logarithm functions are correct") {
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "exp_e"), std::exp(1.0),   1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "ln_e"),  1.0,              1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "lg10"),  2.0,              1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "exp_e"), std::exp(1.0),
+                        1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "ln_e"), 1.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "lg10"), 2.0, 1e-12);
     }
     THEN("sqrt is correct") {
       FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sq"), 3.0, 1e-12);
@@ -825,7 +841,7 @@ TEST_CASE("pips - Math functions") {
       FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "ab_pos"), 3.0, 1e-12);
     }
     THEN("sign is correct") {
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sg_pos"),  1.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sg_pos"), 1.0, 1e-12);
       FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sg_neg"), -1.0, 1e-12);
       FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sg_zero"), 0.0, 1e-12);
     }
@@ -834,29 +850,31 @@ TEST_CASE("pips - Math functions") {
       FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "fl"), 1.0, 1e-12);
     }
     THEN("Trig functions are correct") {
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn"),  0.5,    1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_pi"), 0.0,    1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_pi2"), 1.0,    1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_2pi"), 0.0,    1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_npi"), 0.0,    1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_npi2"), -1.0,   1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_n2pi"), 0.0,    1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs"),  0.5,    1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_pi"), -1.0,   1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_pi2"), 0.0,    1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_2pi"), 1.0,    1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_npi"), -1.0,   1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_npi2"), 0.0,    1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_n2pi"), 1.0,    1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn"),  1.0,    1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn_pi"), 0.0,    1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn_2pi"), 0.0,    1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn_npi"), 0.0,    1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn_n2pi"), 0.0,    1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "ac"),  0.0,    1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "as"),  pi/2.0, 1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "at"),  pi/4.0, 1e-12);
-      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "at2"), pi/4.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn"), 0.5, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_pi"), 0.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_pi2"), 1.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_2pi"), 0.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_npi"), 0.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_npi2"), -1.0,
+                        1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "sn_n2pi"), 0.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs"), 0.5, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_pi"), -1.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_pi2"), 0.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_2pi"), 1.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_npi"), -1.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_npi2"), 0.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "cs_n2pi"), 1.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn"), 1.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn_pi"), 0.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn_2pi"), 0.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn_npi"), 0.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "tn_n2pi"), 0.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "ac"), 0.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "as"), pi / 2.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "at"), pi / 4.0, 1e-12);
+      FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "at2"), pi / 4.0,
+                        1e-12);
     }
     THEN("min and max are correct") {
       FLOAT_REQUIRE_TOL(deck.GetCardValue<double>("fn", "mn"), 3.0, 1e-12);
@@ -865,7 +883,8 @@ TEST_CASE("pips - Math functions") {
   }
 }
 
-// Helper: redirect stdout to a pipe, run f(), restore stdout, return captured text.
+// Helper: redirect stdout to a pipe, run f(), restore stdout, return captured
+// text.
 static std::string captureStdout(std::function<void()> f) {
   int pipefd[2];
   pipe(pipefd);
@@ -891,17 +910,17 @@ static std::string captureStdout(std::function<void()> f) {
 TEST_CASE("pips - print() function") {
   GIVEN("A deck that calls print() on various types") {
     std::string output = captureStdout([] {
-      Rummy::Deck deck;
+      Rummy::SimpleDeck deck;
       std::stringstream ss;
       ss << "num = 42\n"
          << "<out>\n"
          << "flt = 3.5\n"
          << "boo = true\n"
-         << "str = \"hello\"\n"
+         << "string = \"hello\"\n"
          << "print(\"num =\", num)\n"
          << "print(\"flt =\", out.flt)\n"
          << "print(\"boo =\", out.boo)\n"
-         << "print(\"str =\", out.str)\n";
+         << "print(\"string =\", out.string)\n";
       deck.Build(ss);
     });
 
@@ -909,13 +928,14 @@ TEST_CASE("pips - print() function") {
       REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("num = 42"));
       REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("flt = 3.5"));
       REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("boo = true"));
-      REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("str = hello"));
+      REQUIRE_THAT(output,
+                   Catch::Matchers::ContainsSubstring("string = hello"));
     }
   }
 
   GIVEN("A deck that calls print() with multiple arguments") {
     std::string output = captureStdout([] {
-      Rummy::Deck deck;
+      Rummy::SimpleDeck deck;
       std::stringstream ss;
       ss << "<out>\n"
          << "a = 1\n"
@@ -933,7 +953,7 @@ TEST_CASE("pips - print() function") {
 TEST_CASE("pips - __globals__ command") {
   GIVEN("A deck with several variables followed by __globals__") {
     std::string output = captureStdout([] {
-      Rummy::Deck deck;
+      Rummy::SimpleDeck deck;
       std::stringstream ss;
       ss << "speed = 42\n"
          << "label = \"fast\"\n"
@@ -949,7 +969,8 @@ TEST_CASE("pips - __globals__ command") {
     THEN("Each declared variable appears in the output") {
       REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("speed = 42"));
       REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("label = fast"));
-      REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("suit1.flag = true"));
+      REQUIRE_THAT(output,
+                   Catch::Matchers::ContainsSubstring("suit1.flag = true"));
       REQUIRE_THAT(output, Catch::Matchers::ContainsSubstring("flag = true"));
     }
   }
@@ -957,7 +978,7 @@ TEST_CASE("pips - __globals__ command") {
 
 TEST_CASE("Deck - Reopen suit and redefine card") {
   GIVEN("A deck where a suit is opened a second time to redefine a card") {
-    Rummy::Deck deck_out;
+    Rummy::SimpleDeck deck_out;
     std::string output = captureStdout([&deck_out] {
       std::stringstream ss;
       ss << "<mesh>\n"
@@ -978,14 +999,16 @@ TEST_CASE("Deck - Reopen suit and redefine card") {
 }
 
 TEST_CASE("Deck - Dotted name redefinition") {
-  GIVEN("A deck where a previously declared card is redefined using dotted syntax") {
-    Rummy::Deck deck_out;
+  GIVEN("A deck where a previously declared card is redefined using dotted "
+        "syntax") {
+    Rummy::SimpleDeck deck_out;
     std::string output = captureStdout([&deck_out] {
       std::stringstream ss;
       ss << "<mesh>\n"
          << "nx1 = 2\n"
          << "<hydro>\n"
-         << "mesh.nx1 = 4\n"  // dotted absolute redefinition from a different suit
+         << "mesh.nx1 = 4\n" // dotted absolute redefinition from a different
+                             // suit
          << "print(mesh.nx1)\n";
       deck_out.Build(ss);
     });
@@ -1000,14 +1023,16 @@ TEST_CASE("Deck - Dotted name redefinition") {
 }
 
 TEST_CASE("Deck - Dotted name redefinition of a vector element") {
-  GIVEN("A deck where one element of a previously declared vector is redefined using dotted syntax") {
-    Rummy::Deck deck_out;
+  GIVEN("A deck where one element of a previously declared vector is redefined "
+        "using dotted syntax") {
+    Rummy::SimpleDeck deck_out;
     std::string output = captureStdout([&deck_out] {
       std::stringstream ss;
       ss << "<mesh>\n"
          << "coords = 1, 2, 3\n"
          << "<hydro>\n"
-         << "mesh.coords[1] = 99\n"  // dotted absolute redefinition of a vector element
+         << "mesh.coords[1] = 99\n" // dotted absolute redefinition of a vector
+                                    // element
          << "print(mesh.coords[1])\n";
       deck_out.Build(ss);
     });
@@ -1026,14 +1051,16 @@ TEST_CASE("Deck - Dotted name redefinition of a vector element") {
 }
 
 TEST_CASE("Deck - Dotted name redefinition of a vector slice") {
-  GIVEN("A deck where a slice of a previously declared vector is redefined using dotted syntax") {
-    Rummy::Deck deck_out;
+  GIVEN("A deck where a slice of a previously declared vector is redefined "
+        "using dotted syntax") {
+    Rummy::SimpleDeck deck_out;
     std::string output = captureStdout([&deck_out] {
       std::stringstream ss;
       ss << "<mesh>\n"
          << "coords = 1, 2, 3\n"
          << "<hydro>\n"
-         << "mesh.coords[:2] = [10, 20]\n"  // dotted slice redefinition of first two elements
+         << "mesh.coords[:2] = [10, 20]\n" // dotted slice redefinition of first
+                                           // two elements
          << "print(mesh.coords[0])\n"
          << "print(mesh.coords[1])\n";
       deck_out.Build(ss);
@@ -1053,14 +1080,16 @@ TEST_CASE("Deck - Dotted name redefinition of a vector slice") {
   }
 }
 
-TEST_CASE("Deck - Global variable element and slice redefinition before any suit") {
-  GIVEN("A deck where vector element and slice updates happen before any suit declaration") {
-    Rummy::Deck deck_out;
+TEST_CASE(
+    "Deck - Global variable element and slice redefinition before any suit") {
+  GIVEN("A deck where vector element and slice updates happen before any suit "
+        "declaration") {
+    Rummy::SimpleDeck deck_out;
     std::string output = captureStdout([&deck_out] {
       std::stringstream ss;
       ss << "mesh.coords = 1, 2, 3, 4\n"
-         << "mesh.coords[2] = 99\n"          // single element update
-         << "mesh.coords[:2] = [10, 20]\n"   // slice update
+         << "mesh.coords[2] = 99\n"        // single element update
+         << "mesh.coords[:2] = [10, 20]\n" // slice update
          << "print(mesh.coords[0])\n"
          << "print(mesh.coords[1])\n"
          << "print(mesh.coords[2])\n";
@@ -1094,7 +1123,8 @@ TEST_CASE("Deck - Include Statement") {
       f << "<suit2>\n"
         << "card3 = 100\n"
         << "include_dir = \"subdir\"\n"
-        << "include = 50 #comment\n"; // should not conflict with include keyword
+        << "include = 50 #comment\n"; // should not conflict with include
+                                      // keyword
     }
     {
       std::ofstream f(tmp / "main.in");
@@ -1104,7 +1134,7 @@ TEST_CASE("Deck - Include Statement") {
         << "include \"included.in\" # comment\n";
     }
 
-    Rummy::Deck deck;
+    Rummy::SimpleDeck deck;
     deck.Build((tmp / "main.in").string());
 
     THEN("Cards from the main file are present") {
@@ -1115,9 +1145,38 @@ TEST_CASE("Deck - Include Statement") {
       REQUIRE(deck.DoesSuitExist("suit2"));
       FLOAT_REQUIRE(deck.GetCardValue<double>("suit2", "card3"), 100.0);
       FLOAT_REQUIRE(deck.GetCardValue<double>("suit2", "include"), 50.0);
-      REQUIRE(deck.GetCardValue<std::string>("suit2", "include_dir") == "subdir");
+      REQUIRE(deck.GetCardValue<std::string>("suit2", "include_dir") ==
+              "subdir");
     }
 
     fs::remove_all(tmp);
+  }
+}
+TEST_CASE("Deck - Vector slice with element-wise math") {
+  GIVEN(
+      "A Rummy stream that defines a 3-element vector, then cubes a 2-element "
+      "sub-slice") {
+    Rummy::SimpleDeck deck;
+    // base[:3] defines [2.0, 3.0, 4.0].
+    // cubed[:2] = base[:2] ** 3 takes only the first two elements and cubes
+    // them.
+    std::istringstream ss("<block>\n"
+                          "base[:3] = [2.0, 3.0, 4.0]\n"
+                          "cubed[:2] = base[:2] ** 3\n");
+    deck.Build(ss);
+
+    THEN("Base vector retains all three elements") {
+      auto b = deck.GetVector<double>("block", "base");
+      REQUIRE(b.size() == 3);
+      REQUIRE(b[0] == 2.0);
+      REQUIRE(b[1] == 3.0);
+      REQUIRE(b[2] == 4.0);
+    }
+    THEN("Cubed slice contains only the first two elements, each cubed") {
+      auto c = deck.GetVector<double>("block", "cubed");
+      REQUIRE(c.size() == 2);
+      FLOAT_REQUIRE(c[0], 8.0);  // 2^3
+      FLOAT_REQUIRE(c[1], 27.0); // 3^3
+    }
   }
 }

@@ -1,0 +1,18 @@
+# Schema for tst/unit/inputs/strict_gas.par
+# Headers in strict_gas.par use the form `<Gas(matN)>`; the schema key must
+# match the header node name (i.e. "Gas").
+Gas:
+  _type: node
+  rho:
+    _type: Real
+  T:
+    _type: Real
+  eos:
+    _type: node
+    _class: Eos
+    type:
+      _type: string
+      _default: ideal
+    gamma:
+      _type: Real
+      _default: 1.4

@@ -41,17 +41,17 @@ vars = "density", "velocity", "pressure"
 <gas>
  name = "hydrogen"
 
-<../eos>                              # relative nodes, expands to gas/eos
+<./eos>                              # child of current suit: gas/eos
  type = "ideal"         
  gamma = 5.0/3.0
  cv = 1.0/(gamma - 1.0)               # Reference local variables in your node
 
-<../conductivity>
+<./conductivity>
  kappa = hcond/(rho * gas.eos.cv)     # reference other node variables 
  
 <hydro>
  cfl = 0.8
-<../riemann>
+<./riemann>
  solver = "hllc"
 
 print(gas.conductivity.kappa)         # Print variables to stdout when the input deck is compiled
@@ -66,10 +66,80 @@ print(gas.conductivity.kappa)         # Print variables to stdout when the input
 * Vector slice operations
 * String addition
 * Boolean logical operations
-* Relative suits (`<../subnode>`)
+* Relative suits (`<./subnode>`, `<../sibling>`, `<../../uncle>`, …)
 * Global cards (i.e., no suit)
 * A `print` function that can print any previously defined card.
 * Error messages. 
+* YAML schema for strict-mode decks (see below).
+
+# YAML schema (strict mode)
+
+Strict-mode `FullDeck` requires a YAML schema describing every class
+(suit) the deck may instantiate, its fields, and any defaults or allowed
+values.  The schema replaces the legacy practice of supplying raw pips
+`class X { ... }` definitions as a string.
+
+Reserved keys (all prefixed with `_`):
+
+| Key            | Meaning                                                 |
+|----------------|---------------------------------------------------------|
+| `_type`        | `node` for class instances; otherwise a primitive (`Real`, `int`, `bool`, `string`) for leaf fields. |
+| `_class`       | Implementation class name for nodes (default: `Capitalize(key)`). |
+| `_description` | Free-form documentation                                 |
+| `_default`     | Default value for a leaf field                          |
+| `_allowed`     | Inline list `[a, b, c]` of permitted values             |
+
+A mapping is a *node* iff its `_type` is `node`, or it carries a
+`_class` key.  A mapping with a primitive `_type` (or with `_default` /
+`_allowed`) is a *leaf field*.
+
+Example:
+
+```yaml
+gas:
+  _type: node
+  _class: Gas
+  _description: Hydrodynamics solver settings.
+  rho:
+    _type: Real
+    _description: Density.
+  T:
+    _type: Real
+    _description: Temperature.
+  eos:
+    _type: node
+    _class: Eos
+    _description: Equation of state.
+    type:
+      _type: string
+      _allowed: [ideal, table]
+      _default: ideal
+    gamma:
+      _type: Real
+      _default: 1.4
+```
+
+## CLI
+
+```bash
+rummy <deck.par>                  # Loose mode, no schema
+rummy <deck.par> <schema.yaml>    # Strict mode with the given schema
+```
+
+## C++ API
+
+```c++
+#include <rummy/full_deck.hpp>
+#include <rummy/yaml_schema.hpp>
+
+// From a file:
+Rummy::FullDeck d(Rummy::FullDeck::Mode::Strict, "schema.yaml");
+d.Build("deck.par");
+
+// Or from an in-memory string:
+auto schema = Rummy::Schema::FromString(R"(...)");
+Rummy::FullDeck d2(Rummy::FullDeck::Mode::Strict, schema);
+```
 
 # Including
 
